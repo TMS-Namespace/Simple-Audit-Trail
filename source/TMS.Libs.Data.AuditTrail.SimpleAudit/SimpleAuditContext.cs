@@ -116,21 +116,6 @@ public abstract class SimpleAuditContext : DbContext
         return false;
     }
 
-    //private static bool IsMatchingExpression(LambdaExpression expression, string propertyName)
-    //{
-    //    if (expression.Body is UnaryExpression unaryExpression && unaryExpression.Operand is MemberExpression memberOperand)
-    //    {
-    //        return memberOperand.Member.Name == propertyName;
-    //    }
-
-    //    if (expression.Body is MemberExpression memberExpression)
-    //    {
-    //        return memberExpression.Member.Name == propertyName;
-    //    }
-
-    //    return false;
-    //}
-
     private async Task PerformAuditingAsync(
         List<RowAuditInfo> rowsAuditInfo,
         object? customAuditInfo,
