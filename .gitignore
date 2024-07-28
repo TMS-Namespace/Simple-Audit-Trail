@@ -486,3 +486,5 @@ $RECYCLE.BIN/
 
 [Bb]in/
 [Oo]bj/
+
+*.vscode
