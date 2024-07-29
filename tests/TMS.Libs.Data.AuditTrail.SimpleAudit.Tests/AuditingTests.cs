@@ -1,5 +1,6 @@
 using Bogus;
-
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.TestDataBase.Models;
@@ -167,4 +168,71 @@ public class AuditingTests
                 null);
         }
     }
+
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Should_RollBack_Audit_Trails_On_Error(bool explicitInclude)
+    {
+        // arrange
+        CustomAuditInfo? customAuditInfo;
+        AuditableTableModel? auditableRow;
+
+        var contextFactory = new ContextFactory();
+
+        var initialAuditTrailsCount = 0;
+        var initialContextChangesCount = 0;
+
+        using (var dbContext = contextFactory.Create())
+        {
+            (auditableRow, customAuditInfo) = await Tools.SeedAsync(dbContext);
+
+            // act
+            _auditConfig.Config(dbContext, explicitInclude);
+
+            // changes count and audit trails count should not change
+            initialContextChangesCount = dbContext
+                        .ChangeTracker
+                        .Entries()
+                        .Where(e => e.State 
+                            is EntityState.Added 
+                            or EntityState.Deleted  
+                            or EntityState.Modified)
+                        .Count();
+
+            initialAuditTrailsCount = await dbContext.AuditTrailTable.CountAsync();
+
+            // we will trigger primary key violation error
+            auditableRow.NotAuditableTableModelId = 1000;
+            auditableRow.CompanyName = "Test";
+
+            var action = async () => await dbContext.SaveChangesAsync();
+
+            // assert
+
+            await action.Should().ThrowAsync<DbUpdateException>();
+
+            // added audit trail records should not be tracked anymore
+            dbContext
+                .ChangeTracker
+                .Entries()
+                .Where(e => e.State
+                    is EntityState.Added
+                    or EntityState.Deleted
+                    or EntityState.Modified)
+                .Count()
+                .Should().Be(initialContextChangesCount + 1); // the row that we changed
+        }
+
+        using (var dbContext = contextFactory.Create())
+        {
+            var newAuditTrailsCount = await dbContext.AuditTrailTable.CountAsync();
+
+            // no audit trail records should be added
+            newAuditTrailsCount.Should().Be(initialAuditTrailsCount);
+        }
+
+    }
+
 }

@@ -12,7 +12,8 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help
 {
     internal static class Tools
     {
-        public static async Task<(AuditableTableModel, CustomAuditInfo)> SeedAsync(AuditableContext dbContext)
+
+        public static (NotAuditableTableModel, AuditableTableModel, CustomAuditInfo) GenerateModels()
         {
             var notAuditableRow = new AutoFaker<NotAuditableTableModel>()
                     .RuleFor(e => e.AuditableTableModels, f => [])
@@ -29,6 +30,13 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help
             var customAuditInfo = new AutoFaker<CustomAuditInfo>()
                     .RuleFor(e => e.IpAddress, f => f.Internet.IpAddress().ToString())
                 .Generate();
+
+            return (notAuditableRow, auditableRow, customAuditInfo);
+        }
+
+        public static async Task<(AuditableTableModel, CustomAuditInfo)> SeedAsync(AuditableContext dbContext)
+        {
+            var (notAuditableRow , auditableRow , customAuditInfo) = GenerateModels();
 
             await dbContext.AddAsync(notAuditableRow);
             await dbContext.AddAsync(auditableRow);
