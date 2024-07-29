@@ -13,6 +13,9 @@ public abstract class SimpleAuditContext : DbContext
 
     private bool _auditingIsEnabled;
 
+    // we will keep a list of generate audit trails to clean DBContext in case of failure.
+    private readonly List<object> _auditTrails = [];
+
     #endregion
 
     #region Private
@@ -108,9 +111,6 @@ public abstract class SimpleAuditContext : DbContext
         if (AuditableEntities.TryGetValue(entityEntry.Entity.GetType(), out var auditedPropertiesNames))
         {
             return auditedPropertiesNames.Contains(propertyEntry.Metadata.Name);
-            //var propertyName = propertyEntry.Metadata.Name;
-
-            //return auditedPropertiesNames.Any(ce => IsMatchingExpression(ce, propertyName));
         }
 
         return false;
@@ -126,8 +126,6 @@ public abstract class SimpleAuditContext : DbContext
             return;
         }
 
-        var auditTrailRecords = 0;
-
         foreach (var rowAuditInfo in rowsAuditInfo)
         {
             // this is called after saving the outer changes, so if new rows inserted, we should now have the actual values for primary keys in case of auto-increment
@@ -138,32 +136,22 @@ public abstract class SimpleAuditContext : DbContext
 
             rowAuditInfo.PrimaryKeyValue = primaryKey.CurrentValue!;
 
-            var auditRecordTask = AuditMappingCallBackAsync!.DynamicInvoke(rowAuditInfo, customAuditInfo, cancellationToken);
+            var auditRecord = await AuditMappingCallBackAsync!(rowAuditInfo, customAuditInfo, cancellationToken);
 
-            if (auditRecordTask is Task task)
+            if (auditRecord != null)
             {
-                await task;
-
-                if (task.GetType().IsGenericType && task.GetType().GetGenericTypeDefinition() == typeof(Task<>))
+                if (auditRecord.GetType() == AuditTrailTableModelType)
                 {
-                    var resultProperty = task.GetType().GetProperty("Result");
-                    var auditRecord = resultProperty?.GetValue(task);
+                    _auditTrails.Add(auditRecord);
 
-                    if (auditRecord != null)
-                    {
-                        if (auditRecord.GetType() == AuditTrailTableModelType)
-                        {
-                            Add(auditRecord);
-                            auditTrailRecords++;
+                    this.Add(auditRecord);
 
-                            continue;
-                        }
-                    }
-                    else
-                    {
-                        continue;
-                    }
+                    continue;
                 }
+            }
+            else
+            {
+                continue;
             }
 
             throw new InvalidOperationException("AuditMappingCallBackAsync should return a Task<TAuditTrailModel?>.");
@@ -171,9 +159,9 @@ public abstract class SimpleAuditContext : DbContext
 
         var savedCount = await base.SaveChangesAsync(cancellationToken);
 
-        if (savedCount != auditTrailRecords)
+        if (savedCount != _auditTrails.Count)
         {
-            throw new InvalidOperationException("Not all audit trail records are saved.");
+            throw new InvalidOperationException("Something went wrong, not all audit trail records are saved.");
         }
     }
 
@@ -181,9 +169,7 @@ public abstract class SimpleAuditContext : DbContext
 
     #region Internal
 
-    internal Delegate? AuditMappingCallBackAsync { get; set; }
-
-    //internal Dictionary<Type, List<LambdaExpression>> AuditableEntities { get; } = [];
+    internal Func<RowAuditInfo, object?, CancellationToken, Task<object?>>? AuditMappingCallBackAsync { get; set; }
 
     internal Dictionary<Type, List<string>> AuditableEntities { get; } = [];
 
@@ -287,11 +273,18 @@ public abstract class SimpleAuditContext : DbContext
 
             await transaction.CommitAsync(cancellationToken);
 
+            _auditTrails.Clear();
+
             return result;
         }
         catch
         {
             await transaction.RollbackAsync(cancellationToken);
+
+            // clean up DB Context from the generated trails
+            this.RemoveRange(_auditTrails);
+            _auditTrails.Clear();
+
             throw;
         }
     }

@@ -12,13 +12,23 @@ public sealed class AuditTrailConfiguration<TAuditTrailModel>
 
     private readonly SimpleAuditContext _dbContext;
 
+    private readonly Func<RowAuditInfo, object?, CancellationToken, Task<TAuditTrailModel?>> _auditMappingCallBackAsync;
+
+    #endregion
+
+    #region Private
+
+    private async Task<object?> AuditMappingCallBackAsync(RowAuditInfo rowAuditInfo, object? customAuditInfo, CancellationToken cancellationToken)
+        // this is a trick to be able to define AuditMappingCallBackAsync as a variable on the SimpleAuditContext class level while stay ignorant about TAuditTrailModel generic type, and to avoid using reflection during invoking the call back.
+        => await _auditMappingCallBackAsync(rowAuditInfo, customAuditInfo, cancellationToken);
+
     #endregion
 
     #region Internal
 
     internal AuditTrailConfiguration(
         SimpleAuditContext dbContext,
-        Func<RowAuditInfo, object, CancellationToken, Task<TAuditTrailModel?>> auditMappingCallBack)
+        Func<RowAuditInfo, object?, CancellationToken, Task<TAuditTrailModel?>> auditMappingCallBackAsync)
     {
 
         if (!dbContext.IsTableType<TAuditTrailModel>())
@@ -29,7 +39,9 @@ public sealed class AuditTrailConfiguration<TAuditTrailModel>
         _dbContext = dbContext;
 
         _dbContext.AuditTrailTableModelType = typeof(TAuditTrailModel);
-        _dbContext.AuditMappingCallBackAsync = auditMappingCallBack;
+
+        _auditMappingCallBackAsync = auditMappingCallBackAsync;
+        _dbContext.AuditMappingCallBackAsync = AuditMappingCallBackAsync;
     }
 
     #endregion

@@ -1,6 +1,6 @@
 # Simple Audit Trail
 
-A simple and fast plug & play library to enable audit trails in any database using Entity Framework.
+A light, simple and fast plug & play library to enable audit trails in any database using Entity Framework.
 
 ## Features
 
@@ -9,7 +9,7 @@ A simple and fast plug & play library to enable audit trails in any database usi
 - Mapping of the audit information that will be saved is configurable.
 - Custom audit information can be passed.
 - Audit trail will be saved along with all other changes in a single transaction, and rolled back in case of any error.
-- Tables and columns are audited with original SQL names, not the EF model names.
+- Tables and columns are audited with original SQL names, not the mapped EF model names.
 
 ## Usage
 
@@ -69,23 +69,24 @@ var dbContext = new MyDbContext();
 // as well as passing the audit trail information
 // mapping function as a call back that will be
 // defined in what follows
-dbContext.ConfigureAuditTrail<MyAuditTrailModel>(MyAuditMappingCallBackAsync)
-         // configure how 'MyTableModel1' should be audited
-         .ConfigureTableAudit<MyTableModel1>()
-            // start with tracking all table columns except primary and foreign keys
-            .AuditAllColumns(AutoExcludeColumnType.PrimaryKey | AutoExcludeColumnType.ForeignKey)
-            // but also exclude those two
-            .ExcludeColumns(
-                tbl => tbl.Column3,
-                tbl => tbl.Column4)
-         // configure how 'MyTableModel2' should be audited
-         .ConfigureTableAudit<MyTableModel2>()
-            // audit only two of the columns
-            .AuditColumns(
-                tbl => tbl.Column1,
-                tbl => tbl.Column2)
-         // activate auditing immediately
-         .StartAuditing();
+dbContext
+    .ConfigureAuditTrail<MyAuditTrailModel>(MyAuditMappingCallBackAsync)
+        // configure how 'MyTableModel1' should be audited
+        .ConfigureTableAudit<MyTableModel1>()
+        // start with tracking all table columns except primary and foreign keys
+        .AuditAllColumns(AutoExcludeColumnType.PrimaryKey | AutoExcludeColumnType.ForeignKey)
+        // but also exclude those two
+        .ExcludeColumns(
+            tbl => tbl.Column3,
+            tbl => tbl.Column4)
+        // configure how 'MyTableModel2' should be audited
+        .ConfigureTableAudit<MyTableModel2>()
+        // audit only two of the columns
+        .AuditColumns(
+            tbl => tbl.Column1,
+            tbl => tbl.Column2)
+        // activate auditing immediately
+        .StartAuditing();
 ```
 
 audit information for every row are passed as `RowAuditInfo` class instance, and `rowAuditInfo.ColumnChanges` is a list of `ColumnAuditInfo` instances that holds information about the audited columns (like sql column name, old and new value). `RowAuditInfo` class instance is passed to the mapping call back function, that can be defined as follows:
@@ -118,6 +119,7 @@ public async Task<MyAuditTrailModel?> MyAuditMappingCallBackAsync(
         {
             ReferenceId = (int)auditInfo.PrimaryKeyValue,
             TableName = auditInfo.TableSQLName,
+
             Action = auditInfo.Action.ToString(),
 
             UserName = customInfo.UserName,
@@ -143,7 +145,7 @@ finally, above call back function will be executed whenever auditing is enabled,
 
 var customInfo = new MyCustomAuditInfo()
     {
-        UserName = "Mr. A.B.",
+        UserName = "Mr. Been",
         IpAddress = "15.15.15.15"
     };
 
@@ -152,4 +154,5 @@ await dbContext.SaveChangesAsync(customInfo, someCancellationToken);
 
 ## Dependencies
 
-The project is built using .Net 8, and has no external dependencies (Beside EF).
+- The main project is built using .Net 8, and has no external dependencies (Beside EF).
+- Tests are done on an in-memory SQLite DB, and has some external dependencies.

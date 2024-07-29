@@ -27,7 +27,7 @@ public static class Extensions
         var entityType = entryEntity.Metadata;
         var property = entityType.FindProperty(propertyEntry.Metadata.Name);
 
-        var columnName = property?.GetColumnName(StoreObjectIdentifier.Table(entityType.GetTableName()!, entityType.GetSchema()));
+        var columnName = property!.GetColumnName(StoreObjectIdentifier.Table(entityType.GetTableName()!, entityType.GetSchema()));
 
         return columnName!;
     }
