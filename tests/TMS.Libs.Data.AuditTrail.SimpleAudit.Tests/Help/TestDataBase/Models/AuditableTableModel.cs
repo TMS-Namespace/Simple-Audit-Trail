@@ -1,6 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Query.Internal;
-
-namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.TestDataBase.Models;
+﻿namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.TestDataBase.Models;
 
 // SQL table name: auditable_table
 public partial class AuditableTableModel

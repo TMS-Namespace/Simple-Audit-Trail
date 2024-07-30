@@ -1,12 +1,14 @@
+using Microsoft.EntityFrameworkCore;
+using System.Globalization;
+
 using Bogus;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
+
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.TestDataBase.Models;
-using System.Globalization;
 
-namespace DataRepository.Tests.Integration;
+namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests;
 
 public class AuditingTests
 {
@@ -37,12 +39,12 @@ public class AuditingTests
         using (var dbContext = contextFactory.Create())
         {
             var columnChanges = await Tools.AssertTrailsAndGetColumnChangesAsync(
-                                    dbContext,
-                                    auditableRow.Id,
-                                    AuditAction.Add,
-                                    customAuditInfo,
-                                    2 // CompanyName & Count
-                                    );
+                dbContext,
+                auditableRow.Id,
+                AuditAction.Add,
+                customAuditInfo,
+                2); // CompanyName & Count
+
 
             Tools.AssertColumnValues(
                 dbContext,
@@ -96,12 +98,11 @@ public class AuditingTests
         using (var dbContext = contextFactory.Create())
         {
             var columnChanges = await Tools.AssertTrailsAndGetColumnChangesAsync(
-                                    dbContext,
-                                    auditableRow.Id,
-                                    AuditAction.Update,
-                                    customAuditInfo,
-                                    2 // CompanyName & Count
-                                    );
+                dbContext,
+                auditableRow.Id,
+                AuditAction.Update,
+                customAuditInfo,
+                2); // CompanyName & Count
 
             Tools.AssertColumnValues(
                 dbContext,
@@ -147,12 +148,11 @@ public class AuditingTests
         using (var dbContext = contextFactory.Create())
         {
             var columnChanges = await Tools.AssertTrailsAndGetColumnChangesAsync(
-                                    dbContext,
-                                    auditableRow.Id,
-                                    AuditAction.Delete,
-                                    customAuditInfo,
-                                    2 // CompanyName & Count
-                                    );
+                dbContext,
+                auditableRow.Id,
+                AuditAction.Delete,
+                customAuditInfo,
+                2); // CompanyName & Count
 
             Tools.AssertColumnValues(
                 dbContext,
@@ -193,13 +193,7 @@ public class AuditingTests
             _auditConfig.Config(dbContext, explicitInclude);
 
             // changes count and audit trails count should not change
-            initialContextChangesCount = dbContext
-                        .ChangeTracker
-                        .Entries()
-                        .Count(e => e.State 
-                            is EntityState.Added 
-                            or EntityState.Deleted  
-                            or EntityState.Modified);
+            initialContextChangesCount = Tools.GetAuditableChangesCount(dbContext);
 
             initialAuditTrailsCount = await dbContext.AuditTrailTable.CountAsync();
 
@@ -214,14 +208,9 @@ public class AuditingTests
             await action.Should().ThrowAsync<DbUpdateException>();
 
             // added audit trail records should not be tracked anymore
-            dbContext
-                .ChangeTracker
-                .Entries()
-                .Count(e => e.State
-                    is EntityState.Added
-                    or EntityState.Deleted
-                    or EntityState.Modified)
-                .Should().Be(initialContextChangesCount + 1); // the row that we changed
+            Tools.GetAuditableChangesCount(dbContext)
+                .Should()
+                .Be(initialContextChangesCount + 1); // the row that we changed
         }
 
         using (var dbContext = contextFactory.Create())

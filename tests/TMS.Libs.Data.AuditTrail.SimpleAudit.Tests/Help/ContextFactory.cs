@@ -3,49 +3,48 @@ using Microsoft.EntityFrameworkCore;
 using SQLitePCL;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.TestDataBase;
 
-namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help
+namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help;
+
+internal class ContextFactory : IDisposable
 {
-    internal class ContextFactory : IDisposable
+    private readonly DbContextOptions<SimpleAuditContext> _options;
+
+    private readonly SqliteConnection _connection;
+
+    private bool _isFirstContextInstance = true;
+
+    public ContextFactory()
     {
-        private readonly DbContextOptions<SimpleAuditContext> _options;
+        Batteries.Init();
 
-        private readonly SqliteConnection _connection;
+        // in-memory DB life time is bounded to connection openness,
+        // so we need to re-use options for every new Context instance
+        // in factory life scope
+        _connection = new SqliteConnection("DataSource=:memory:");
 
-        private bool _isFirstContextInstance = true;
+        _options = new DbContextOptionsBuilder<SimpleAuditContext>()
+            .UseSqlite(_connection)
+            .Options;
+    }
 
-        public ContextFactory()
+    public void Dispose()
+    {
+        _connection.Close();
+        _connection.Dispose();
+    }
+
+    public AuditableContext Create()
+    {
+        var dbContext = new AuditableContext(_options);
+
+        if (_isFirstContextInstance)
         {
-            Batteries.Init();
+            dbContext.Database.OpenConnection();
+            dbContext.Database.EnsureCreated();
 
-            // in-memory DB life time is bounded to connection openness,
-            // so we need to re-use options for every new Context instance
-            // in factory life scope
-            _connection = new SqliteConnection("DataSource=:memory:");
-
-            _options = new DbContextOptionsBuilder<SimpleAuditContext>()
-                .UseSqlite(_connection)
-                .Options;
+            _isFirstContextInstance = false;
         }
 
-        public void Dispose()
-        {
-            _connection.Close();
-            _connection.Dispose();
-        }
-
-        public AuditableContext Create()
-        {
-            var dbContext = new AuditableContext(_options);
-
-            if (_isFirstContextInstance)
-            {
-                dbContext.Database.OpenConnection();
-                dbContext.Database.EnsureCreated();
-
-                _isFirstContextInstance = false;
-            }
-
-            return dbContext;
-        }
+        return dbContext;
     }
 }
