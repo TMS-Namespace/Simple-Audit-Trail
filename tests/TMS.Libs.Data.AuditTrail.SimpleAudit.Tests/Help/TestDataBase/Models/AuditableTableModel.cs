@@ -5,7 +5,7 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.TestDataBase.Models;
 // SQL table name: auditable_table
 public partial class AuditableTableModel
 {
-    //primary key, DB-side auto-increment, SQL column name: id
+    // primary key, DB-side auto-increment, SQL column name: id
     public int Id { get; set; }
 
     // SQL column name : company_name
@@ -23,8 +23,8 @@ public partial class AuditableTableModel
     // a property that will not be mapped to any SQL column
     public int CountQuadruplet
     {
-        set { }
         get => Count * 4;
+        set { }
     }
 
     // SQL column name: created_id
@@ -34,5 +34,4 @@ public partial class AuditableTableModel
     public int NotAuditableTableModelId { get; set; }
 
     public required NotAuditableTableModel NotAuditableTableModel { get; set; }
-
 }

@@ -14,12 +14,6 @@ public partial class AuditableContext : SimpleAuditContext
 
     public AuditableContext(DbContextOptions<SimpleAuditContext> options) : base(options) { }
 
-    //protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    //{
-    //    optionsBuilder.UseSqlite("DataSource=:memory:");
-    //}
-
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AuditableTableModel>(entity =>
@@ -162,5 +156,4 @@ public partial class AuditableContext : SimpleAuditContext
                 .HasForeignKey(e => e.NotAuditableTableModelId);
         });
     }
-
 }

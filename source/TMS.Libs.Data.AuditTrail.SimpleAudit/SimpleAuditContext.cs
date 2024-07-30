@@ -53,7 +53,7 @@ public abstract class SimpleAuditContext : DbContext
                     Mapping.ToModel(entityEntry.State),
                     this.GetTableModelType(entityEntry))
             {
-                TrackingEntityEntry = entityEntry
+                TrackingEntityEntry = entityEntry,
             };
 
             foreach (var propertyEntry in entityEntry.Properties)
@@ -65,7 +65,7 @@ public abstract class SimpleAuditContext : DbContext
                         ColumnSQLName = this.GetSQLColumnName(entityEntry, propertyEntry),
                         // EF assigns to Original value same value as new value on insertion
                         OldValue = entityEntry.State == EntityState.Added ? null : propertyEntry.OriginalValue,
-                        NewValue = entityEntry.State == EntityState.Deleted ? null : propertyEntry.CurrentValue
+                        NewValue = entityEntry.State == EntityState.Deleted ? null : propertyEntry.CurrentValue,
                     };
 
                     rowAuditInfo.ColumnsChanges.Add(columnChanges);
@@ -178,9 +178,9 @@ public abstract class SimpleAuditContext : DbContext
 
     #region Public
 
-    public SimpleAuditContext(DbContextOptions<SimpleAuditContext> options) : base(options) { }
+    protected SimpleAuditContext(DbContextOptions<SimpleAuditContext> options) : base(options) { }
 
-    public SimpleAuditContext(DbContextOptions options) : base(options) { }
+    protected SimpleAuditContext(DbContextOptions options) : base(options) { }
 
     /// <summary>
     /// The type of the model which is used for audit trail.
@@ -200,7 +200,7 @@ public abstract class SimpleAuditContext : DbContext
     /// </remarks>
     /// <returns>An <see cref="AuditTrailConfiguration{TAuditTrailTableModel}"/> instance.</returns>
     public AuditTrailConfiguration<TAuditTrailTableModel> ConfigureAuditTrail<TAuditTrailTableModel>(
-        Func<RowAuditInfo, object, CancellationToken, Task<TAuditTrailTableModel?>> auditMappingCallBackAsync)
+        Func<RowAuditInfo, object?, CancellationToken, Task<TAuditTrailTableModel?>> auditMappingCallBackAsync)
         where TAuditTrailTableModel : class
         => new(this, auditMappingCallBackAsync);
 
@@ -245,7 +245,7 @@ public abstract class SimpleAuditContext : DbContext
     public int SaveChanges(dynamic? customProperties)
         => SaveChangesAsync(customProperties, CancellationToken.None).GetAwaiter().GetResult();
 
-    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken)
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         => await SaveChangesAsync(null, cancellationToken);
 
     public async Task<int> SaveChangesAsync()

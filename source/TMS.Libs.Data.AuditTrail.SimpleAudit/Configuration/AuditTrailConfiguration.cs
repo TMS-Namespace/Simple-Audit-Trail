@@ -30,7 +30,6 @@ public sealed class AuditTrailConfiguration<TAuditTrailModel>
         SimpleAuditContext dbContext,
         Func<RowAuditInfo, object?, CancellationToken, Task<TAuditTrailModel?>> auditMappingCallBackAsync)
     {
-
         if (!dbContext.IsTableType<TAuditTrailModel>())
         {
             throw new InvalidOperationException($"The type {typeof(TAuditTrailModel).Name} is not recognized as a table model.");
@@ -69,7 +68,6 @@ public sealed class AuditTrailConfiguration<TAuditTrailModel>
 
         foreach (var entityType in entityTypes)
         {
-
             var genericType = typeof(TableAuditConfiguration<>).MakeGenericType(entityType);
 
             var constructor = genericType.GetConstructor(

@@ -25,7 +25,6 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help
             _options = new DbContextOptionsBuilder<SimpleAuditContext>()
                 .UseSqlite(_connection)
                 .Options;
-
         }
 
         public void Dispose()
@@ -48,6 +47,5 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help
 
             return dbContext;
         }
-
     }
 }

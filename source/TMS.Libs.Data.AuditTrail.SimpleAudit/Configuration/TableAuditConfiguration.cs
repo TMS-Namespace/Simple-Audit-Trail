@@ -49,7 +49,7 @@ public sealed class TableAuditConfiguration<TTableModel>
         => _dbContext
         .GetEntityType<TTableModel>()
         .GetProperties()
-        .Where(p => ValidateColumnProperty(p));
+        .Where(IsColumnProperty);
 
 
     /// <summary>
@@ -57,13 +57,20 @@ public sealed class TableAuditConfiguration<TTableModel>
     /// </summary>
     /// <param name="property"></param>
     /// <returns></returns>
-    private static bool ValidateColumnProperty(IProperty property)
+    private static bool IsColumnProperty(IProperty property)
     => property.GetTableColumnMappings().Any();
 
+    private static void ValidateColumnProperty(IProperty property)
+    {
+        if (!IsColumnProperty(property))
+        {
+            throw new InvalidOperationException($"The property {property} is not mapped to any table column.");
+        }
+    }
 
     private List<IProperty> ValidateAndGetProperties(List<Expression<Func<TTableModel, object?>>> expressions)
     {
-        if (!expressions.Any())
+        if (expressions.Count == 0)
         {
             throw new InvalidOperationException("No columns to audit are provided.");
         }
@@ -72,10 +79,9 @@ public sealed class TableAuditConfiguration<TTableModel>
 
         var properties = expressions.Select(GetPropertyFromExpression).ToList();
 
-        properties.ForEach(p => ValidateColumnProperty(p));
+        properties.ForEach(ValidateColumnProperty);
 
         return properties;
-
     }
 
     private void SetAuditableEntities(List<string> propertiesNames)
@@ -197,8 +203,6 @@ public sealed class TableAuditConfiguration<TTableModel>
     {
         var includedColumns = moreIncludedColumns.ToList();
         includedColumns.Add(includedColumn);
-
-        //var expressions = includedColumns.Compile()(default!)!;
 
         var propertiesNames = ValidateAndGetProperties(includedColumns)
                             .Select(p => p.Name)

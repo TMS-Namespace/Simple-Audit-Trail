@@ -57,7 +57,7 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help
 
                     Changes = changesJson,
 
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
                 };
             }
 

@@ -12,7 +12,6 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help
 {
     internal static class Tools
     {
-
         public static (NotAuditableTableModel, AuditableTableModel, CustomAuditInfo) GenerateModels()
         {
             var notAuditableRow = new AutoFaker<NotAuditableTableModel>()
@@ -97,6 +96,5 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help
 
             return columnChanges;
         }
-
     }
 }

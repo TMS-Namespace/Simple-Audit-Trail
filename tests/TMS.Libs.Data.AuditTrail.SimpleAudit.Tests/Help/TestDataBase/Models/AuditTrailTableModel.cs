@@ -3,7 +3,7 @@
 // SQL table name: audit_trail_table
 public partial class AuditTrailTableModel
 {
-    //primary key, DB-side auto-increment, SQL column name: id
+    // primary key, DB-side auto-increment, SQL column name: id
     public int Id { get; set; }
 
     // SQL column name: reference_id
@@ -17,7 +17,6 @@ public partial class AuditTrailTableModel
 
     // SQL column name: ip_address
     public required string IpAddress { get; set; }
-
 
     // SQL column name: action
     public required string Action { get; set; }

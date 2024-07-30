@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.TestDataBase.Models;
+using System.Globalization;
 
 namespace DataRepository.Tests.Integration;
 
@@ -55,7 +56,7 @@ public class AuditingTests
                 t => t.Count,
                 columnChanges[1],
                 null,
-                auditableRow.Count.ToString());
+                auditableRow.Count.ToString(CultureInfo.InvariantCulture));
         }
     }
 
@@ -113,8 +114,8 @@ public class AuditingTests
                 dbContext,
                 t => t.Count,
                 columnChanges[1],
-                oldCount.ToString(),
-                auditableRow.Count.ToString());
+                oldCount.ToString(CultureInfo.InvariantCulture),
+                auditableRow.Count.ToString(CultureInfo.InvariantCulture));
         }
     }
 
@@ -164,7 +165,7 @@ public class AuditingTests
                 dbContext,
                 t => t.Count,
                 columnChanges[1],
-                auditableRow.Count.ToString(),
+                auditableRow.Count.ToString(CultureInfo.InvariantCulture),
                 null);
         }
     }
@@ -195,11 +196,10 @@ public class AuditingTests
             initialContextChangesCount = dbContext
                         .ChangeTracker
                         .Entries()
-                        .Where(e => e.State 
+                        .Count(e => e.State 
                             is EntityState.Added 
                             or EntityState.Deleted  
-                            or EntityState.Modified)
-                        .Count();
+                            or EntityState.Modified);
 
             initialAuditTrailsCount = await dbContext.AuditTrailTable.CountAsync();
 
@@ -217,11 +217,10 @@ public class AuditingTests
             dbContext
                 .ChangeTracker
                 .Entries()
-                .Where(e => e.State
+                .Count(e => e.State
                     is EntityState.Added
                     or EntityState.Deleted
                     or EntityState.Modified)
-                .Count()
                 .Should().Be(initialContextChangesCount + 1); // the row that we changed
         }
 
@@ -232,7 +231,5 @@ public class AuditingTests
             // no audit trail records should be added
             newAuditTrailsCount.Should().Be(initialAuditTrailsCount);
         }
-
     }
-
 }
