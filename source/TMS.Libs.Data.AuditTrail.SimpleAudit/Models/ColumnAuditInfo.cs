@@ -1,8 +1,19 @@
 namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
 
-public record ColumnAuditInfo 
+public sealed class ColumnAuditInfo
 {
-    public required string ColumnSQLName { get; set; }
+    internal ColumnAuditInfo(string columnSQLName, string propertyName, Type dataType) 
+    {
+        this.ColumnSQLName = columnSQLName;
+        this.PropertyName = propertyName;
+        this.DataType = dataType;
+    }
+
+    public string ColumnSQLName { get; init; }
+
+    public string PropertyName { get; init; }
+
+    public Type DataType { get; init; }
 
     public object? OldValue { get; set; }
 

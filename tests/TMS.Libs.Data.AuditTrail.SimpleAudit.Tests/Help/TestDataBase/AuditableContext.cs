@@ -48,6 +48,12 @@ public partial class AuditableContext : SimpleAuditContext
                 .HasComputedColumnSql("[count] * 2", stored: true);
 
             entity
+                .Property(e => e.EnumColumn)
+                .HasColumnName("enum_column")
+                .HasColumnType("INTEGER")
+                .IsRequired();
+
+            entity
                 .Property(e => e.CreateAt)
                 .HasColumnName("created_at")
                 .HasColumnType("TEXT")

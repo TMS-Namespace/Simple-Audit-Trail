@@ -1,18 +1,33 @@
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using System.Collections.ObjectModel;
 
 namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
 
-public class RowAuditInfo(string tableName, AuditAction action, Type tableModelType)
+public sealed class RowAuditInfo
 {
-    internal EntityEntry? TrackingEntityEntry { get; set; }
+    internal RowAuditInfo(
+        string tableName,
+        AuditAction action,
+        Type modelType,
+        EntityEntry trackingEntityEntry)
+    {
+        this.ModelType = modelType;
+        this.TableSQLName = tableName;
+        this.Action = action;
+        this.TrackingEntityEntry = trackingEntityEntry;
+    }
 
-    public Type TableModelType => tableModelType;
+    internal EntityEntry TrackingEntityEntry { get; init; }
 
-    public string TableSQLName => tableName;
+    public Type ModelType { get; init; }
 
-    public AuditAction Action => action;
+    public string TableSQLName { get; init; }
+
+    public AuditAction Action { get; init; }
 
     public object PrimaryKeyValue { get; internal set; } = default!;
 
-    public List<ColumnAuditInfo> ColumnsChanges { get; } = [];
+    internal List<ColumnAuditInfo> InternalColumnsChanges { get; set; } = [];
+
+    public ReadOnlyCollection<ColumnAuditInfo> ColumnsChanges => this.InternalColumnsChanges.AsReadOnly();
 }

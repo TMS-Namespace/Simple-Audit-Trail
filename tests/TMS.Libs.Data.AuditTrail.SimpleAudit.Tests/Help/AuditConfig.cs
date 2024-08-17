@@ -1,5 +1,6 @@
 ﻿using TMS.Libs.Data.AuditTrail.SimpleAudit.Configuration;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
+using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help.TestDataBase;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.TestDataBase;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.TestDataBase.Models;
 
@@ -12,26 +13,49 @@ public class AuditConfig
         if (explicitInclude)
         {
             dbContext
-                .ConfigureAuditTrail(AuditMappingCallBackAsync)
+                .ConfigureAuditTrail(this.AuditMappingCallBackAsync)
                     .ConfigureTableAudit<AuditableTableModel>()
                     .AuditColumns(
                         t => t.Count,
                         t => t.CompanyName)
+                    .AuditColumn(t => t.EnumColumn, this.ValueMapperCallBack)
                 .StartAuditing();
         }
         else
         {
             dbContext
-                .ConfigureAuditTrail(AuditMappingCallBackAsync)
+                .ConfigureAuditTrail(this.AuditMappingCallBackAsync)
                     .AuditAllTables(AutoExcludeColumnType.All)
                     .ConfigureTableAudit<NotAuditableTableModel>()
                         .ExcludeTableFromAuditing()
                     .ConfigureTableAudit<AuditableTableModel>()
-                        .AuditAllColumns(AutoExcludeColumnType.All)
-                        .ExcludeColumnsFromAuditing(x => x.CreateAt)  // only CompanyName & Count columns are left
+                        .ExcludeColumnsFromAuditing(x => x.CreateAt) // only CompanyName, EnumColumn & Count columns are left
+                        .AuditColumn(t => t.EnumColumn, this.ValueMapperCallBack) // overwrite column config
                 .StartAuditing();
         }
     }
+
+    private string? ValueMapperCallBack(object? value)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+        else
+        {
+            return ((EnumColumn)(int)(uint)value).ToString();
+        }
+    }
+
+    private SerializableColumnChanges Map(ColumnAuditInfo changes)
+    => new()
+        {
+            ColumnSQLName = changes.ColumnSQLName,
+            DataTypeName = changes.DataType.Name,
+            NewValue = changes.NewValue,
+            OldValue = changes.OldValue,
+            PropertyName = changes.PropertyName,
+        };
 
     private async Task<AuditTrailTableModel?> AuditMappingCallBackAsync(
         RowAuditInfo auditInfo,
@@ -41,9 +65,14 @@ public class AuditConfig
         var customInfo = customAuditInfo as CustomAuditInfo
             ?? new() { UserName = "System", IpAddress = "127.0.0.1" };
 
-        if (auditInfo.TableModelType == typeof(AuditableTableModel))
+        if (auditInfo.ModelType == typeof(AuditableTableModel))
         {
-            var changesJson = await Serializing.SerializeAsync(auditInfo.ColumnsChanges, cancellationToken);
+            var changesJson = await Serializing
+                .SerializeAsync(
+                    auditInfo
+                    .ColumnsChanges
+                    .Select(this.Map),
+                cancellationToken);
 
             return new()
             {
@@ -61,6 +90,6 @@ public class AuditConfig
             };
         }
 
-        throw new InvalidOperationException("Non intended model is audited.");
+        throw new InvalidOperationException("A non intended model is audited.");
     }
 }

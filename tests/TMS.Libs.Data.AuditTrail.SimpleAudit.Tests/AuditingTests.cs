@@ -7,6 +7,7 @@ using FluentAssertions;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.TestDataBase.Models;
+using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help.TestDataBase;
 
 namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests;
 
@@ -28,7 +29,7 @@ public class AuditingTests
 
         using (var dbContext = contextFactory.Create())
         {
-            _auditConfig.Config(dbContext, explicitInclude);
+            this._auditConfig.Config(dbContext, explicitInclude);
 
         // act
             (auditableRow, customAuditInfo) = await Tools.SeedAsync(dbContext);
@@ -41,9 +42,9 @@ public class AuditingTests
             var columnChanges = await Tools.AssertTrailsAndGetColumnChangesAsync(
                 dbContext,
                 auditableRow.Id,
-                AuditAction.Add,
+                AuditAction.Added,
                 customAuditInfo,
-                2); // CompanyName & Count
+                3);  // CompanyName, EnumColumn & Count
 
 
             Tools.AssertColumnValues(
@@ -59,6 +60,13 @@ public class AuditingTests
                 columnChanges[1],
                 null,
                 auditableRow.Count.ToString(CultureInfo.InvariantCulture));
+
+            Tools.AssertColumnValues(
+                dbContext,
+                t => t.EnumColumn,
+                columnChanges[2],
+                null,
+                ((EnumColumn)auditableRow.EnumColumn).ToString());
         }
     }
 
@@ -73,6 +81,7 @@ public class AuditingTests
 
         var oldCompanyName = string.Empty;
         var oldCount = 0;
+        uint oldEnumColumn = 0;
 
         var contextFactory = new ContextFactory();
 
@@ -81,13 +90,19 @@ public class AuditingTests
             (auditableRow, customAuditInfo) = await Tools.SeedAsync(dbContext);
 
             // act
-            _auditConfig.Config(dbContext, explicitInclude);
+            this._auditConfig.Config(dbContext, explicitInclude);
 
             oldCompanyName = auditableRow.CompanyName;
             oldCount = auditableRow.Count;
+            oldEnumColumn = auditableRow.EnumColumn;
 
             auditableRow.CompanyName = new Faker().Random.String2(15);
             auditableRow.Count = new Faker().Random.Int(500, 10_000);
+
+            var currentEnumColumn = (EnumColumn)((int)auditableRow.EnumColumn);
+            var newEnumColumn = new Faker().PickRandomWithout(currentEnumColumn);
+            auditableRow.EnumColumn = (uint)newEnumColumn;
+
             auditableRow.CreateAt = new Faker().Date.Past(); // not audited
 
             await dbContext.SaveChangesAsync(customAuditInfo);
@@ -100,9 +115,9 @@ public class AuditingTests
             var columnChanges = await Tools.AssertTrailsAndGetColumnChangesAsync(
                 dbContext,
                 auditableRow.Id,
-                AuditAction.Update,
+                AuditAction.Modified,
                 customAuditInfo,
-                2); // CompanyName & Count
+                3);  // CompanyName, EnumColumn & Count
 
             Tools.AssertColumnValues(
                 dbContext,
@@ -117,6 +132,13 @@ public class AuditingTests
                 columnChanges[1],
                 oldCount.ToString(CultureInfo.InvariantCulture),
                 auditableRow.Count.ToString(CultureInfo.InvariantCulture));
+
+            Tools.AssertColumnValues(
+                dbContext,
+                t => t.EnumColumn,
+                columnChanges[2],
+                ((EnumColumn)oldEnumColumn).ToString(),
+                ((EnumColumn)auditableRow.EnumColumn).ToString());
         }
     }
 
@@ -136,7 +158,7 @@ public class AuditingTests
             (auditableRow, customAuditInfo) = await Tools.SeedAsync(dbContext);
 
             // act
-            _auditConfig.Config(dbContext, explicitInclude);
+            this._auditConfig.Config(dbContext, explicitInclude);
 
             dbContext.Remove(auditableRow);
 
@@ -144,15 +166,14 @@ public class AuditingTests
         }
 
         // assert
-
         using (var dbContext = contextFactory.Create())
         {
             var columnChanges = await Tools.AssertTrailsAndGetColumnChangesAsync(
                 dbContext,
                 auditableRow.Id,
-                AuditAction.Delete,
+                AuditAction.Deleted,
                 customAuditInfo,
-                2); // CompanyName & Count
+                3); // CompanyName, EnumColumn & Count
 
             Tools.AssertColumnValues(
                 dbContext,
@@ -167,9 +188,15 @@ public class AuditingTests
                 columnChanges[1],
                 auditableRow.Count.ToString(CultureInfo.InvariantCulture),
                 null);
+
+            Tools.AssertColumnValues(
+                dbContext,
+                t => t.EnumColumn,
+                columnChanges[2],
+                ((EnumColumn)auditableRow.EnumColumn).ToString(),
+                null);
         }
     }
-
 
     [Theory]
     [InlineData(true)]
@@ -190,7 +217,7 @@ public class AuditingTests
             (auditableRow, customAuditInfo) = await Tools.SeedAsync(dbContext);
 
             // act
-            _auditConfig.Config(dbContext, explicitInclude);
+            this._auditConfig.Config(dbContext, explicitInclude);
 
             // changes count and audit trails count should not change
             initialContextChangesCount = Tools.GetAuditableChangesCount(dbContext);
@@ -204,7 +231,6 @@ public class AuditingTests
             var action = async () => await dbContext.SaveChangesAsync();
 
             // assert
-
             await action.Should().ThrowAsync<DbUpdateException>();
 
             // added audit trail records should not be tracked anymore

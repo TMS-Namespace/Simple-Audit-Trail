@@ -16,7 +16,10 @@ public partial class AuditableTableModel
     public int CountDoubled { get; set; }
 
     // a read only property that will not be mapped to any SQL column
-    public int CountTripled => Count * 3;
+    public int CountTripled => this.Count * 3;
+
+    // SQL column name: enum_column
+    public uint EnumColumn { get; set; }
 
     // a property that will not be mapped to any SQL column
     public int CountQuadruplet

@@ -20,29 +20,29 @@ internal class ContextFactory : IDisposable
         // in-memory DB life time is bounded to connection openness,
         // so we need to re-use options for every new Context instance
         // in factory life scope
-        _connection = new SqliteConnection("DataSource=:memory:");
+        this._connection = new SqliteConnection("DataSource=:memory:");
 
-        _options = new DbContextOptionsBuilder<SimpleAuditContext>()
-            .UseSqlite(_connection)
+        this._options = new DbContextOptionsBuilder<SimpleAuditContext>()
+            .UseSqlite(this._connection)
             .Options;
     }
 
     public void Dispose()
     {
-        _connection.Close();
-        _connection.Dispose();
+        this._connection.Close();
+        this._connection.Dispose();
     }
 
     public AuditableContext Create()
     {
-        var dbContext = new AuditableContext(_options);
+        var dbContext = new AuditableContext(this._options);
 
-        if (_isFirstContextInstance)
+        if (this._isFirstContextInstance)
         {
             dbContext.Database.OpenConnection();
             dbContext.Database.EnsureCreated();
 
-            _isFirstContextInstance = false;
+            this._isFirstContextInstance = false;
         }
 
         return dbContext;

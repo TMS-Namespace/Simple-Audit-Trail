@@ -2,9 +2,9 @@
 
 public enum AuditAction
 {
-    Add,
+    Added,
 
-    Update,
+    Modified,
 
-    Delete,
+    Deleted,
 }

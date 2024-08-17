@@ -2,9 +2,11 @@
 using Microsoft.EntityFrameworkCore;
 using Soenneker.Utils.AutoBogus;
 using System.Linq.Expressions;
+using System.Reflection;
 
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Help;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
+using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help.TestDataBase;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.TestDataBase;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.TestDataBase.Models;
 
@@ -24,6 +26,7 @@ internal static class Tools
                 .RuleFor(e => e.Id, f => 0)
                 .RuleFor(e => e.CreateAt, f => DateTime.UtcNow)
                 .RuleFor(e => e.NotAuditableTableModel, f => notAuditableRow)
+                .RuleFor(e => e.EnumColumn, f => (uint)f.PickRandom<EnumColumn>())
             .Generate();
 
         var customAuditInfo = new AutoFaker<CustomAuditInfo>()
@@ -35,7 +38,7 @@ internal static class Tools
 
     public static async Task<(AuditableTableModel, CustomAuditInfo)> SeedAsync(AuditableContext dbContext)
     {
-        var (notAuditableRow , auditableRow , customAuditInfo) = GenerateModels();
+        var (notAuditableRow, auditableRow, customAuditInfo) = GenerateModels();
 
         await dbContext.AddAsync(notAuditableRow);
         await dbContext.AddAsync(auditableRow);
@@ -50,7 +53,7 @@ internal static class Tools
     public static void AssertColumnValues(
         AuditableContext dbContext,
         Expression<Func<AuditableTableModel, object?>> propertyExpression,
-        ColumnAuditInfo columnAuditInfo,
+        SerializableColumnChanges columnAuditInfo,
         string? oldValue,
         string? newValue)
     {
@@ -58,13 +61,32 @@ internal static class Tools
 
         sqlColumnName.Should().Match(s => s.Contains('_') || s.All(char.IsLower));
 
+        var (propName, propType) = GetExpressionDetails(propertyExpression);
+
+        columnAuditInfo.PropertyName.Should().Be(propName);
+        columnAuditInfo.DataTypeName.Should().Be(propType.Name);
         columnAuditInfo.ColumnSQLName.Should().Be(sqlColumnName);
 
-        columnAuditInfo.OldValue?.ToString().Should().Be(oldValue);
-        columnAuditInfo.NewValue?.ToString()!.Should().Be(newValue);
+        if (oldValue is null)
+        {
+            columnAuditInfo.OldValue.Should().BeNull();
+        }
+        else
+        {
+            columnAuditInfo.OldValue!.ToString().Should().Be(oldValue);
+        }
+
+        if (newValue is null)
+        {
+            columnAuditInfo.NewValue.Should().BeNull();
+        }
+        else
+        {
+            columnAuditInfo.NewValue!.ToString().Should().Be(newValue);
+        }
     }
 
-    public static async Task<List<ColumnAuditInfo>> AssertTrailsAndGetColumnChangesAsync(
+    public static async Task<List<SerializableColumnChanges>> AssertTrailsAndGetColumnChangesAsync(
         AuditableContext dbContext,
         int referenceId,
         AuditAction expectedAction,
@@ -89,7 +111,7 @@ internal static class Tools
         auditTrail.UserName.Should().Be(expectedCustomAuditInfo.UserName);
         auditTrail.IpAddress.Should().Be(expectedCustomAuditInfo.IpAddress);
 
-        var columnChanges = await Serializing.DeserializeAsync<List<ColumnAuditInfo>>(auditTrail.Changes, CancellationToken.None);
+        var columnChanges = await Serializing.DeserializeAsync<List<SerializableColumnChanges>>(auditTrail.Changes, CancellationToken.None);
 
         columnChanges.Should().NotBeNull();
         columnChanges!.Count.Should().Be(expectedColumnChanges);
@@ -105,4 +127,23 @@ internal static class Tools
                     is EntityState.Added
                     or EntityState.Deleted
                     or EntityState.Modified);
+
+    private static (string PropertyName, Type PropertyType) GetExpressionDetails(Expression<Func<AuditableTableModel, object?>> propertyExpression)
+    {
+        // if property returns reference type
+        var expression = propertyExpression.Body as MemberExpression;
+
+        if (expression == null)
+        {
+            // if the property returns value type
+            var unaryExpression = (UnaryExpression)propertyExpression.Body;
+            expression = (MemberExpression)unaryExpression.Operand;
+        }
+
+        var member = expression.Member;
+
+        var propInfo = (PropertyInfo)member;
+
+        return (member.Name, propInfo.PropertyType);
+    }
 }
