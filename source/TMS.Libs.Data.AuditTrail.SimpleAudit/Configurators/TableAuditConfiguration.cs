@@ -4,7 +4,7 @@ using System.Linq.Expressions;
 
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Help;
 
-namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Configuration;
+namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Configurators;
 
 public sealed class TableAuditConfiguration<TTableModel>
     where TTableModel : class
@@ -43,13 +43,13 @@ public sealed class TableAuditConfiguration<TTableModel>
     // Retrieves all properties that are mapped to SQL columns
     private IEnumerable<IProperty> GetColumnsProperties()
         => this._dbContext
-        .GetEntityType<TTableModel>()
-        .GetProperties()
-        .Where(IsColumnProperty);
+            .GetEntityType<TTableModel>()
+            .GetProperties()
+            .Where(IsColumnProperty);
 
     // checks if the property actually mapped to an SQL column.
     private static bool IsColumnProperty(IProperty property)
-    => property.GetTableColumnMappings().Any();
+        => property.GetTableColumnMappings().Any();
 
     private static void ValidateColumnProperty(IProperty property)
     {
@@ -75,31 +75,6 @@ public sealed class TableAuditConfiguration<TTableModel>
         return properties;
     }
 
-    private void SetAuditableProperties(List<string> propertiesNames)
-    {
-        var entitySettings = this._dbContext
-            .EntitiesAuditSettings
-            .SingleOrDefault(s => s.EntityType == this._entityType);
-
-        if (entitySettings == null)
-        {
-            entitySettings = new() { EntityType = this._entityType };
-            this._dbContext.EntitiesAuditSettings.Add(entitySettings);
-        }
-
-        foreach (var propertyName in propertiesNames)
-        {
-            if (entitySettings.AuditableProperties.ContainsKey(propertyName))
-            {
-                entitySettings.AuditableProperties[propertyName] = null;
-            }
-            else
-            {
-                entitySettings.AuditableProperties.Add(propertyName, null);
-            }
-        }
-    }
-
     private IProperty GetPropertyFromExpression (Expression<Func<TTableModel, object?>> expression)
     {
         var member = expression.Body as MemberExpression
@@ -107,42 +82,45 @@ public sealed class TableAuditConfiguration<TTableModel>
 
         if (member == null)
         {
-            throw new ArgumentException("Expression is not a valid member expression.");
+            throw new InvalidOperationException("Expression is not a valid member expression.");
         }
 
         var entityType = this._dbContext.GetEntityType<TTableModel>();
 
         return entityType.FindProperty(member.Member.Name)
-            ?? throw new ArgumentException($"The property {member.Member.Name} is not found in {this._entityType.Name} table model.");
+            ?? throw new InvalidOperationException($"The property {member.Member.Name} is not found in {this._entityType.Name} table model.");
     }
 
     private static bool ValidateSimpleMemberAccess(Expression<Func<TTableModel, object?>> expression)
     {
         // for the case : x=> x.Prop where Prop is Object
-        if (expression.Body is MemberExpression memberExpression 
+        if (expression.Body is MemberExpression memberExpression
             && memberExpression.Expression is ParameterExpression)
         {
             return true;
         }
 
         // for the case : x=> x.Prop where Prop is not Object, where it will be explicitly converted to Object due to our expressions signature
-        if (expression.Body is UnaryExpression unaryExpression 
-            && unaryExpression.Operand is MemberExpression operandMemberExpression 
+        if (expression.Body is UnaryExpression unaryExpression
+            && unaryExpression.Operand is MemberExpression operandMemberExpression
             && operandMemberExpression.Expression is ParameterExpression)
         {
             return true;
         }
 
-        throw new ArgumentException("Only simple member access expressions are accepted: " + expression.Body);
+        throw new InvalidOperationException("Only simple member access expressions are accepted: " + expression.Body);
     }
 
     #endregion
 
     #region Internal
 
-    internal TableAuditConfiguration(SimpleAuditContext dbContext)
+    private string? _tableAlias;
+
+    internal TableAuditConfiguration(SimpleAuditContext dbContext, string? tableAlias)
     {
         this._dbContext = dbContext;
+        this._tableAlias = tableAlias;
 
         if (!this._dbContext.IsTableType<TTableModel>())
         {
@@ -184,25 +162,14 @@ public sealed class TableAuditConfiguration<TTableModel>
             throw new InvalidOperationException($"The table model {this._entityType} has no auditable columns.");
         }
 
-        this.SetAuditableProperties(propertiesNames);
+        this._dbContext.AuditSettings.Set(this._entityType, this._tableAlias, propertiesNames);
 
         return this;
     }
 
     public TableAuditConfiguration<TTableModel> ExcludeTableFromAuditing()
     {
-        var entitySettings = this._dbContext
-            .EntitiesAuditSettings
-            .SingleOrDefault(s => s.EntityType == this._entityType)
-            ?? throw new InvalidOperationException($"The table model type {this._entityType.Name} is not configured for audit yet to be excluded.");
-
-        this._dbContext.EntitiesAuditSettings.Remove(entitySettings);
-
-        if (this._dbContext.EntitiesAuditSettings.Count == 0)
-        {
-            throw new InvalidOperationException("No tables left for auditing.");
-        }
-
+        _dbContext.AuditSettings.Remove(this._entityType);
         return this;
     }
 
@@ -219,7 +186,7 @@ public sealed class TableAuditConfiguration<TTableModel>
                             .Select(p => p.Name)
                             .ToList();
 
-        this.SetAuditableProperties(propertiesNames);
+        this._dbContext.AuditSettings.Set(this._entityType, this._tableAlias, propertiesNames);
 
         return this;
     }
@@ -233,57 +200,43 @@ public sealed class TableAuditConfiguration<TTableModel>
     public TableAuditConfiguration<TTableModel>
        AuditColumn(
        Expression<Func<TTableModel, object?>> includedColumn,
-       Func<object?, object?> valueMapperCallBack)
+       Func<object?, object?>? valueMapperCallBack = null,
+       string? columnAlias = null)
     {
         var propertiesNames = this.ValidateAndGetProperties([includedColumn])
                             .Select(p => p.Name)
                             .ToList();
 
-        this.SetAuditableProperties(propertiesNames);
-
         // set the value mapper call back
-        this._dbContext
-            .EntitiesAuditSettings
-            .Single(s => s.EntityType == this._entityType)
-            .AuditableProperties[propertiesNames[0]] = valueMapperCallBack;
+        this._dbContext.AuditSettings.Set(
+            this._entityType,
+            this._tableAlias,
+            propertiesNames[0],
+            valueMapperCallBack,
+            columnAlias);
 
         return this;
     }
 
     public TableAuditConfiguration<TTableModel> ExcludeColumnsFromAuditing(
-        Expression<Func<TTableModel, object?>> excludedColumn, 
+        Expression<Func<TTableModel, object?>> excludedColumn,
         params Expression<Func<TTableModel, object?>>[] moreExcludedColumns)
     {
         var excludedColumns = moreExcludedColumns.ToList();
         excludedColumns.Add(excludedColumn);
 
         var propertiesNamesToExclude = this.ValidateAndGetProperties(excludedColumns)
-                        .Select(p => p.Name);
+                .Select(p => p.Name)
+                .ToList();
 
-        var entitySettings = this._dbContext
-            .EntitiesAuditSettings
-            .SingleOrDefault(s => s.EntityType == this._entityType)
-            ?? throw new InvalidOperationException($"The table {this._entityType.Name} is not yet configured for audit.");
-
-        foreach (var propertyName in propertiesNamesToExclude)
-        {
-            if (!entitySettings.AuditableProperties.Remove(propertyName))
-            {
-                throw new InvalidOperationException($"The property {propertyName} is not yet set to be audited.");
-            }
-        }
-
-        if (entitySettings.AuditableProperties.Count == 0)
-        {
-            throw new InvalidOperationException($"No columns left to audit in {this._entityType.Name} table.");
-        }
+        _dbContext.AuditSettings.Remove(this._entityType, propertiesNamesToExclude);
 
         return this;
     }
 
-    public TableAuditConfiguration<TAnotherEntity> ConfigureTableAudit<TAnotherEntity>()
+    public TableAuditConfiguration<TAnotherEntity> ConfigureTableAudit<TAnotherEntity>(string? tableAlias = null)
         where TAnotherEntity : class
-        => new(this._dbContext);
+        => new(this._dbContext, tableAlias);
 
     #endregion
 }

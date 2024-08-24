@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
-
 using System.Linq.Expressions;
 
 namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Help;
@@ -10,27 +9,46 @@ public static class Extensions
 {
     #region Internal
 
-    internal static IEntityType GetEntityType(this SimpleAuditContext dbContext, string tableModelTypeName)
+    internal static IEntityType GetEntityType(
+        this SimpleAuditContext dbContext,
+        string tableModelTypeName)
         =>
             // Note that EF built in FindEntityType requires full CLR name of the entity type
             dbContext
-            .Model
-            .GetEntityTypes()
-            .SingleOrDefault(et => et.ClrType.Name == tableModelTypeName)
-            ?? throw new ArgumentException($"No table found of '{tableModelTypeName}' model type name.");
+                .Model
+                .GetEntityTypes()
+                .SingleOrDefault(et => et.ClrType.Name == tableModelTypeName)
+                ?? throw new InvalidOperationException($"No table found of '{tableModelTypeName}' model type name.");
 
     internal static IEntityType GetEntityType<TTableModel>(this SimpleAuditContext dbContext)
         => dbContext.GetEntityType(typeof(TTableModel).Name);
 
-    internal static string GetSQLColumnName(this SimpleAuditContext _, EntityEntry entryEntity, PropertyEntry propertyEntry)
+    internal static string GetSQLColumnName(
+        this SimpleAuditContext _,
+        EntityEntry entryEntity,
+        PropertyEntry propertyEntry)
     {
         var entityType = entryEntity.Metadata;
-        var property = entityType.FindProperty(propertyEntry.Metadata.Name);
+        var property = entityType.FindProperty(propertyEntry.Metadata.Name)
+            ?? throw new InvalidOperationException($"The column {propertyEntry.Metadata.Name} is not found in {entryEntity.Metadata.Name} table.");
 
-        var columnName = property!.GetColumnName(StoreObjectIdentifier.Table(entityType.GetTableName()!, entityType.GetSchema()));
+        var columnName = property
+            .GetColumnName(
+                StoreObjectIdentifier
+                .Table(entityType.GetTableName()!, entityType.GetSchema()));
 
         return columnName!;
     }
+
+    internal static IProperty GetProperty(IEntityType entryEntity, string propertyName)
+        => entryEntity.FindProperty(propertyName)
+            ?? throw new InvalidOperationException($"The column {propertyName} is not found in {entryEntity} table.");
+
+    internal static string GetSQLColumnName(
+        this SimpleAuditContext _,
+        IEntityType entryEntity,
+        string propertyName)
+    => GetProperty(entryEntity, propertyName).GetColumnName();
 
     internal static string GetSQLTableName(this SimpleAuditContext _, EntityEntry entityEntry)
         => entityEntry.Metadata.GetTableName()!;
@@ -38,6 +56,27 @@ public static class Extensions
     internal static Type GetTableModelType(this SimpleAuditContext _, EntityEntry entityEntry)
         => entityEntry.Metadata.ClrType;
 
+    public static Type GetColumnType(
+        this SimpleAuditContext dbContext,
+        Type tableModelType,
+        string propertyName)
+    {
+        var entityType = dbContext.GetEntityType(tableModelType.Name);
+        return GetProperty(entityType, propertyName)
+            .ClrType;
+    }
+
+    public static string GetColumnSQLType(
+    this SimpleAuditContext dbContext,
+    Type tableModelType,
+    string propertyName)
+    {
+        var entityType = dbContext.GetEntityType(tableModelType.Name);
+
+        return GetProperty(entityType, propertyName)
+            .GetRelationalTypeMapping()
+            .StoreType;
+    }
 
     #endregion
 
@@ -45,6 +84,9 @@ public static class Extensions
 
     public static string GetSQLTableName(this SimpleAuditContext dbContext, string tableModelTypeName)
         => dbContext.GetEntityType(tableModelTypeName).GetTableName()!;
+
+    public static string GetSQLTableName(this SimpleAuditContext dbContext, Type tableModelType)
+        => dbContext.GetEntityType(tableModelType.Name).GetTableName()!;
 
     public static string GetSQLTableName<TTableModel>(this SimpleAuditContext dbContext)
         where TTableModel : class
@@ -60,24 +102,38 @@ public static class Extensions
 
         if (member == null)
         {
-            throw new ArgumentException("Expression is not a valid member expression.");
+            throw new InvalidOperationException("Expression is not a valid member expression.");
         }
 
-        var entityType = dbContext.GetEntityType<TTableModel>();
-
-        var property = entityType.FindProperty(member.Member.Name)
-            ?? throw new ArgumentException($"The column {member.Member.Name} is not found in {typeof(TTableModel).Name} table.");
-
-        return property.GetColumnName();
+        return dbContext.GetSQLColumnName<TTableModel>(member.Member.Name);
     }
+
+    public static string GetSQLColumnName<TTableModel>(
+        this SimpleAuditContext dbContext,
+        string propertyName)
+        where TTableModel : class
+        => dbContext.GetSQLColumnName(dbContext.GetEntityType<TTableModel>(), propertyName);
+
+    public static string GetSQLColumnName(
+        this SimpleAuditContext dbContext,
+        string tableModelTypeName,
+        string propertyName)
+        => dbContext.GetSQLColumnName(dbContext.GetEntityType(tableModelTypeName), propertyName);
+
+    public static string GetSQLColumnName(
+        this SimpleAuditContext dbContext,
+        Type tableModelType,
+        string propertyName)
+        => dbContext.GetSQLColumnName(dbContext.GetEntityType(tableModelType.Name), propertyName);
 
     public static Type GetModelType(this SimpleAuditContext dbContext, string tableSQLName)
     {
         var model = dbContext.Model;
         var entityTypes = model.GetEntityTypes();
 
-        var entityType = entityTypes.SingleOrDefault(et => dbContext.GetSQLTableName(et.ClrType.Name) == tableSQLName)
-            ?? throw new ArgumentException($"The table '{tableSQLName}' has no associated model.");
+        var entityType = entityTypes
+            .SingleOrDefault(et => dbContext.GetSQLTableName(et.ClrType.Name) == tableSQLName)
+            ?? throw new InvalidOperationException($"The table '{tableSQLName}' has no associated model.");
 
         return entityType.ClrType;
     }

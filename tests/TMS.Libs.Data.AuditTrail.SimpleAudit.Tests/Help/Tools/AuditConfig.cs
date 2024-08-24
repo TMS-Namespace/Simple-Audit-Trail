@@ -1,24 +1,33 @@
-﻿using TMS.Libs.Data.AuditTrail.SimpleAudit.Configuration;
+﻿using Bogus;
+using TMS.Libs.Data.AuditTrail.SimpleAudit.Configurators;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help.TestDataBase;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.TestDataBase;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.TestDataBase.Models;
 
-namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help;
+namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help.Tools;
 
 public class AuditConfig
 {
+    public string? AuditableTableAlias = null;
+    public string? EnumColumnAlias = null;
+
+    private static Faker _faker = new Faker();
+
     public void Config(AuditableContext dbContext, bool explicitInclude)
     {
+        AuditableTableAlias = _faker.Random.Bool() ? _faker.Random.Word() : null;
+        EnumColumnAlias = _faker.Random.Bool() ? _faker.Random.Word() : null;
+
         if (explicitInclude)
         {
             dbContext
                 .ConfigureAuditTrail(this.AuditMappingCallBackAsync)
-                    .ConfigureTableAudit<AuditableTableModel>()
+                    .ConfigureTableAudit<AuditableTableModel>(AuditableTableAlias)
                     .AuditColumns(
                         t => t.Count,
                         t => t.CompanyName)
-                    .AuditColumn(t => t.EnumColumn, this.ValueMapperCallBack)
+                    .AuditColumn(t => t.EnumColumn, this.ValueMapperCallBack, EnumColumnAlias)
                 .StartAuditing();
         }
         else
@@ -28,9 +37,9 @@ public class AuditConfig
                     .AuditAllTables(AutoExcludeColumnType.All)
                     .ConfigureTableAudit<NotAuditableTableModel>()
                         .ExcludeTableFromAuditing()
-                    .ConfigureTableAudit<AuditableTableModel>()
+                    .ConfigureTableAudit<AuditableTableModel>(AuditableTableAlias)
                         .ExcludeColumnsFromAuditing(x => x.CreateAt) // only CompanyName, EnumColumn & Count columns are left
-                        .AuditColumn(t => t.EnumColumn, this.ValueMapperCallBack) // overwrite column config
+                        .AuditColumn(t => t.EnumColumn, this.ValueMapperCallBack, EnumColumnAlias) // overwrite column config
                 .StartAuditing();
         }
     }
@@ -50,11 +59,12 @@ public class AuditConfig
     private SerializableColumnChanges Map(ColumnAuditInfo changes)
     => new()
         {
-            ColumnSQLName = changes.ColumnSQLName,
+            ColumnSQLName = changes.ColumnNameAlias ?? changes.ColumnSQLName,
             DataTypeName = changes.DataType.Name,
             NewValue = changes.NewValue,
             OldValue = changes.OldValue,
-            PropertyName = changes.PropertyName,
+            DataSQLTypeName = changes.DataSQLTypeName,
+            PropertyName =  changes.PropertyName,
         };
 
     private async Task<AuditTrailTableModel?> AuditMappingCallBackAsync(
@@ -77,7 +87,7 @@ public class AuditConfig
             return new()
             {
                 ReferenceId = (int)auditInfo.PrimaryKeyValue,
-                TableName = auditInfo.TableSQLName,
+                TableName = auditInfo.TableNameAlias ?? auditInfo.TableSQLName,
 
                 Action = auditInfo.Action.ToString(),
 

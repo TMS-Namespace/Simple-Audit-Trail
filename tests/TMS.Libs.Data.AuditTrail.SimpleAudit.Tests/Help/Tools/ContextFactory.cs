@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SQLitePCL;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.TestDataBase;
 
-namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help;
+namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help.Tools;
 
 internal class ContextFactory : IDisposable
 {

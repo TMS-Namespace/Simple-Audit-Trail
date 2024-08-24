@@ -6,28 +6,33 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
 public sealed class RowAuditInfo
 {
     internal RowAuditInfo(
-        string tableName,
+        string tableSQLName,
         AuditAction action,
         Type modelType,
-        EntityEntry trackingEntityEntry)
+        EntityEntry trackingEntityEntry,
+        string? alias)
     {
         this.ModelType = modelType;
-        this.TableSQLName = tableName;
+        this.TableSQLName = tableSQLName;
         this.Action = action;
         this.TrackingEntityEntry = trackingEntityEntry;
+        this.TableNameAlias = alias;
     }
 
-    internal EntityEntry TrackingEntityEntry { get; init; }
+    internal EntityEntry TrackingEntityEntry { get; private init; }
 
-    public Type ModelType { get; init; }
+    public Type ModelType { get; private init; }
 
-    public string TableSQLName { get; init; }
+    public string TableSQLName { get; private init; }
 
-    public AuditAction Action { get; init; }
+    public string? TableNameAlias { get; private init; }
+
+    public AuditAction Action { get; private init; }
 
     public object PrimaryKeyValue { get; internal set; } = default!;
 
-    internal List<ColumnAuditInfo> InternalColumnsChanges { get; set; } = [];
+    internal List<ColumnAuditInfo> ColumnsAuditInfos { get; } = [];
 
-    public ReadOnlyCollection<ColumnAuditInfo> ColumnsChanges => this.InternalColumnsChanges.AsReadOnly();
+    public ReadOnlyCollection<ColumnAuditInfo> ColumnsChanges
+        => this.ColumnsAuditInfos.AsReadOnly();
 }

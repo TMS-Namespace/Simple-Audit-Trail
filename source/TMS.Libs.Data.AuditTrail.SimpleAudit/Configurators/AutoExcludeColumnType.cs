@@ -1,4 +1,4 @@
-namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Configuration;
+namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Configurators;
 
 [Flags]
 public enum AutoExcludeColumnType

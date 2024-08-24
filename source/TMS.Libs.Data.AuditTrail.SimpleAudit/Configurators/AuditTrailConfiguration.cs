@@ -3,7 +3,7 @@ using System.Reflection;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Help;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
 
-namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Configuration;
+namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Configurators;
 
 public sealed class AuditTrailConfiguration<TAuditTrailModel>
     where TAuditTrailModel : class
@@ -37,10 +37,10 @@ public sealed class AuditTrailConfiguration<TAuditTrailModel>
 
         this._dbContext = dbContext;
 
-        this._dbContext.AuditTrailTableModelType = typeof(TAuditTrailModel);
+        this._dbContext.AuditSettings.AuditTrailTableModelType = typeof(TAuditTrailModel);
 
         this._auditMappingCallBackAsync = auditMappingCallBackAsync;
-        this._dbContext.AuditMappingCallBackAsync = this.AuditMappingCallBackAsync;
+        this._dbContext.AuditSettings.AuditMappingCallBackAsync = this.AuditMappingCallBackAsync;
     }
 
     #endregion
@@ -54,15 +54,16 @@ public sealed class AuditTrailConfiguration<TAuditTrailModel>
         return this;
     }
 
-    public TableAuditConfiguration<TTableModel> ConfigureTableAudit<TTableModel>()
+    public TableAuditConfiguration<TTableModel> ConfigureTableAudit<TTableModel>(string? tableAlias = null)
         where TTableModel : class
-        => new(this._dbContext);
+        => new(this._dbContext, tableAlias);
 
     public AuditTrailConfiguration<TAuditTrailModel> AuditAllTables(AutoExcludeColumnType exclusions = AutoExcludeColumnType.None)
     {
         var entityTypes = _dbContext.Model.GetEntityTypes()
                     .Select(e => e.ClrType)
-                    .Where(e => e != typeof(TAuditTrailModel) && this._dbContext.IsTableType(e));
+                    .Where(e => e != typeof(TAuditTrailModel)
+                            && this._dbContext.IsTableType(e));
 
         var methodName = nameof(TableAuditConfiguration<TAuditTrailModel>.AuditAllColumns);
 
@@ -73,10 +74,10 @@ public sealed class AuditTrailConfiguration<TAuditTrailModel>
             var constructor = genericType.GetConstructor(
                     BindingFlags.Instance | BindingFlags.NonPublic,
                     null,
-                    [typeof(SimpleAuditContext)],
+                    [typeof(SimpleAuditContext), typeof(string)],
                     null);
 
-            var instance = constructor!.Invoke([this._dbContext]);
+            var instance = constructor!.Invoke([this._dbContext, null]);
 
             var executeMethod = genericType.GetMethod(methodName);
 

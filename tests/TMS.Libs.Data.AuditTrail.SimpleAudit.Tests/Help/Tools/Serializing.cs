@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 
-namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help;
+namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help.Tools;
 
 internal static class Serializing
 {

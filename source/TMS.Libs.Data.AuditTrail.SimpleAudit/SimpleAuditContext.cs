@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
-using TMS.Libs.Data.AuditTrail.SimpleAudit.Configuration;
+using TMS.Libs.Data.AuditTrail.SimpleAudit.Configurators;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Help;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
+using TMS.Libs.Data.AuditTrail.SimpleAudit.Settings;
 
 namespace TMS.Libs.Data.AuditTrail.SimpleAudit;
 
@@ -20,23 +21,13 @@ public abstract class SimpleAuditContext : DbContext
 
     #region Private
 
-    private bool ValidateIfAuditingConfigured()
-    {
-        if (this.AuditTrailTableModelType is null || this.AuditMappingCallBackAsync is null)
-        {
-            throw new InvalidOperationException("Auditing is not configured yet.");
-        }
-
-        return true;
-    }
-
     private List<RowAuditInfo> GetRowsAuditInfo()
     {
-        var rowsAuditInfo = new List<RowAuditInfo>();
+        var rowsAuditInfos = new List<RowAuditInfo>();
 
-        if (!this.AuditingIsEnabled || this.EntitiesAuditSettings.Count == 0)
+        if (!this.AuditingIsEnabled)
         {
-            return rowsAuditInfo;
+            return rowsAuditInfos;
         }
 
         this.ChangeTracker.DetectChanges();
@@ -49,58 +40,60 @@ public abstract class SimpleAuditContext : DbContext
         foreach (var entityEntry in changedEntries)
         {
             // check if we have any settings for this entry
-            var entitySettings = this.EntitiesAuditSettings
-                .SingleOrDefault(s => s.EntityType == entityEntry.Entity.GetType());
+            var entitySettings = this.AuditSettings.Get(entityEntry.Entity.GetType());
 
             if (entitySettings is null) // no settings for this entity is set
             {
                 continue;
             }
 
-            // create row audit info, and loop over all changed columns
-            var rowAuditInfo = new RowAuditInfo(
-                    this.GetSQLTableName(entityEntry),
-                    Mapping.ToModel(entityEntry.State),
-                    this.GetTableModelType(entityEntry),
-                    entityEntry);
-
-            foreach (var propertyEntry in entityEntry.Properties)
-            {
-                // check if the property has settings, value mapper, and its value actually is changed
-                if (entitySettings.AuditableProperties.TryGetValue(propertyEntry.Metadata.Name, out var valueMappingCallBack)
-                    && IsPropertyValueChanged(entityEntry, propertyEntry))
-                {
-                    // create column audit info
-                    var columnChanges = new ColumnAuditInfo(
-                        this.GetSQLColumnName(entityEntry, propertyEntry),
-                        propertyEntry.Metadata.Name,
-                        propertyEntry.Metadata.ClrType
-                        )
-                    {
-                        // EF assigns to Original value same value as new value on insertion
-                        OldValue = entityEntry.State == EntityState.Added ? null : propertyEntry.OriginalValue,
-                        NewValue = entityEntry.State == EntityState.Deleted ? null : propertyEntry.CurrentValue,
-                    };
-
-                    // if we have value mapper, apply it
-                    if (valueMappingCallBack != null)
-                    {
-                        columnChanges.OldValue = valueMappingCallBack(columnChanges.OldValue);
-                        columnChanges.NewValue = valueMappingCallBack(columnChanges.NewValue);
-                    }
-
-                    rowAuditInfo.InternalColumnsChanges.Add(columnChanges);
-                }
-            }
+            var columnsAuditInfo = entityEntry
+                .Properties
+                .Select(pe => GetColumnAuditInfos(entitySettings, entityEntry, pe))
+                .Where(cai =>  cai != null);
 
             // if no columns are worth tracking, then skip this entity
-            if (rowAuditInfo.InternalColumnsChanges.Count > 0)
+            if (columnsAuditInfo is not null && columnsAuditInfo.Any())
             {
-                rowsAuditInfo.Add(rowAuditInfo);
+                // create row audit info
+                var rowAuditInfo = Mapper.ToModel(entityEntry, entitySettings);
+
+                rowAuditInfo.ColumnsAuditInfos.AddRange(columnsAuditInfo!);
+                rowsAuditInfos.Add(rowAuditInfo);
             }
         }
 
-        return rowsAuditInfo;
+        return rowsAuditInfos;
+    }
+
+    private ColumnAuditInfo? GetColumnAuditInfos(
+        EntityAuditSettings entitySettings,
+        EntityEntry entityEntry,
+        PropertyEntry propertyEntry)
+    {
+        var propertySettings = this.AuditSettings.Get(entitySettings, propertyEntry.Metadata.Name);
+
+        // check if the property has settings, and its value actually is changed
+        if (propertySettings is not null && IsPropertyValueChanged(entityEntry, propertyEntry))
+        {
+            // create column audit info
+            var columnChanges = Mapper.ToModel(propertyEntry, propertySettings);
+
+            // EF assigns to Original value same value as new value on insertion
+            columnChanges.OldValue = entityEntry.State == EntityState.Added ? null : propertyEntry.OriginalValue;
+            columnChanges.NewValue = entityEntry.State == EntityState.Deleted ? null : propertyEntry.CurrentValue;
+
+            // apply value mappers if any
+            if (propertySettings.ValueMapper != null)
+            {
+                columnChanges.OldValue = propertySettings.ValueMapper(columnChanges.OldValue);
+                columnChanges.NewValue = propertySettings.ValueMapper(columnChanges.NewValue);
+            }
+
+            return columnChanges;
+        }
+
+        return null;
     }
 
     private static bool IsEntryHasWhatToAudit(EntityEntry entityEntry)
@@ -126,11 +119,6 @@ public abstract class SimpleAuditContext : DbContext
         return propertyEntry.IsModified;
     }
 
-    private EntityAuditSettings? GetAuditSettings(EntityEntry entityEntry, PropertyEntry propertyEntry)
-    =>
-        this.EntitiesAuditSettings
-        .SingleOrDefault(s => s.EntityType == entityEntry.Entity.GetType());
-
     private async Task PerformAuditingAsync(
         List<RowAuditInfo> rowsAuditInfo,
         object? customAuditInfo,
@@ -145,13 +133,14 @@ public abstract class SimpleAuditContext : DbContext
         {
             // this is called after saving the outer changes, so if new rows inserted, we should now have the actual values for primary keys in case of auto-increment
             var primaryKey = rowAuditInfo
-                        .TrackingEntityEntry
-                        .Properties
-                        .First(p => p.Metadata.IsPrimaryKey());
+                    .TrackingEntityEntry
+                    .Properties
+                    .First(p => p.Metadata.IsPrimaryKey());
 
             rowAuditInfo.PrimaryKeyValue = primaryKey.CurrentValue!;
 
-            var auditRecord = await this.AuditMappingCallBackAsync!(rowAuditInfo, customAuditInfo, cancellationToken);
+            var auditRecord = await this.AuditSettings
+                .AuditMappingCallBackAsync!(rowAuditInfo, customAuditInfo, cancellationToken);
 
             if (auditRecord != null)
             {
@@ -169,7 +158,8 @@ public abstract class SimpleAuditContext : DbContext
                 continue;
             }
 
-            throw new InvalidOperationException("AuditMappingCallBackAsync should return a Task<TAuditTrailModel?>.");
+            throw new InvalidOperationException($"{nameof(this.AuditSettings
+                .AuditMappingCallBackAsync)} should return a Task<TAuditTrailModel?>.");
         }
 
         var savedCount = await base.SaveChangesAsync(cancellationToken);
@@ -182,29 +172,23 @@ public abstract class SimpleAuditContext : DbContext
 
     #endregion
 
-    #region Internal
-
-    internal Func<RowAuditInfo, object?, CancellationToken, Task<object?>>? AuditMappingCallBackAsync { get; set; }
-
-    internal List<EntityAuditSettings> EntitiesAuditSettings { get; } = [];
-
-
-    #endregion
-
     #region Public
+
+    public AuditSettings AuditSettings { get; private set; }
+
 
     protected SimpleAuditContext(DbContextOptions<SimpleAuditContext> options)
         : base(options)
-    { }
+    => this.AuditSettings = new AuditSettings(this);
 
     protected SimpleAuditContext(DbContextOptions options)
         : base(options)
-    { }
+    => this.AuditSettings = new AuditSettings(this);
 
     /// <summary>
     /// The type of the model which is used for audit trail.
     /// </summary>
-    public Type? AuditTrailTableModelType { get; internal set; }
+    public Type? AuditTrailTableModelType => this.AuditSettings.AuditTrailTableModelType;
 
     /// <summary>
     /// Configures the auditing table, auditing mapping callback, and specifies which tables/columns should be audited.
@@ -227,16 +211,19 @@ public abstract class SimpleAuditContext : DbContext
     /// Configure which columns should be audited of the table of <typeparamref name="TTableModel"/> model type.
     /// </summary>
     /// <typeparam name="TTableModel">The table model type to configure.</typeparam>
+    /// <param name="tableAlias">
+    /// Sets the wanted alias for the given table.
+    /// </param>
     /// <remarks>
     /// This can be used only after <paramref name="ConfigureAuditTrail"/> is being executed.
     /// </remarks>
     /// <returns>An <see cref="TableAuditConfiguration{TTableModel}"/> instance.</returns>
-    public TableAuditConfiguration<TTableModel> ConfigureTableAudit<TTableModel>()
+    public TableAuditConfiguration<TTableModel> ConfigureTableAudit<TTableModel>(string? tableAlias = null)
         where TTableModel : class
     {
-        this.ValidateIfAuditingConfigured();
+        this.AuditSettings.ValidateIfAuditingConfigured();
 
-        return new(this);
+        return new(this, tableAlias);
     }
 
     /// <summary>
@@ -249,7 +236,12 @@ public abstract class SimpleAuditContext : DbContext
         {
             if (value) // check only if we enabling auditing
             {
-                this.ValidateIfAuditingConfigured();
+                this.AuditSettings.ValidateIfAuditingConfigured();
+
+                if (!this.AuditSettings.HasEntitiesSettings)
+                {
+                    throw new InvalidOperationException("No tables are set for auditing.");
+                }
             }
 
             this._auditingIsEnabled = value;
@@ -266,9 +258,6 @@ public abstract class SimpleAuditContext : DbContext
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         => await this.SaveChangesAsync(null, cancellationToken);
-
-    public async Task<int> SaveChangesAsync()
-        => await this.SaveChangesAsync(null, CancellationToken.None);
 
     public async Task<int> SaveChangesAsync(object? customAuditInfo)
         => await this.SaveChangesAsync(customAuditInfo, CancellationToken.None);

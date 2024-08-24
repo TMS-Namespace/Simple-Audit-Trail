@@ -1,4 +1,4 @@
-﻿namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help;
+﻿namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests.Help.Tools;
 
 public record CustomAuditInfo
 {

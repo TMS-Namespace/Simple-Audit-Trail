@@ -4,13 +4,14 @@ A light, simple, and fast plug-and-play library to enable audit trails in any da
 
 ## Features
 
-- All audit trails will be saved to a specified table.
+- All audit trails will be saved to a (currently) single table.
 - Tables and columns that should be audited can be fully configured.
 - The mapping of the audit information to be saved is configurable.
-- Value mapping can be configured on a per-column basis.
+- Value mapping and aliases can be configured on a per-column basis.
 - Custom audit information can be passed.
 - The audit trail will be saved along with all other changes in a single transaction and rolled back in case of any error.
 - Tables and columns are audited with their original SQL names, not the mapped EF model/property names.
+- Reflection is used only during configuration of audit trail.
 
 ## Auditing details
 
@@ -173,6 +174,8 @@ await dbContext.SaveChangesAsync(customInfo, cancellationToken);
 
 If your database contains columns that, for example, store the integer values of your enums, but you want your audit trail to contain the enum item names instead of their integer values, you can use Value Mapping. This makes it more convenient to present the audit trails to the end user.
 
+Value mapping, in principle, can be done in the audit trail mapping `MyAuditMappingCallBackAsync` function; however, this would require a long if/else/switch statement that handles different actions depending on the tables and columns. To avoid this, we propose a cleaner approach.
+
 Value mappings can be defined on a per-column basis and therefore can be set only when using the `AuditColumn()` function (and not the `AuditColumns()` function) during configuration.
 
 Let's assume that `MyTableModel1` has the following column:
@@ -180,7 +183,7 @@ Let's assume that `MyTableModel1` has the following column:
 ```csharp
 public partial class MyTableModel1
 {
-    public int EmployeePosition {get; set;}
+    public int EmployeePositionId {get; set;}
 
     ...
 }
@@ -210,7 +213,7 @@ dbContext
             tbl => tbl.Column3,
             tbl => tbl.Column4)
         // define a custom value mapper for EmployeePosition column
-        .AuditColumn(tbl => tbl.EmployeePosition, EmployeePositionMappingCallBack)
+        .AuditColumn(tbl => tbl.EmployeePositionId, EmployeePositionMappingCallBack)
 ```
 
 where the value mapping function provides the database column value as a nullable object and expects a converted nullable object to be returned. In this example, it can be defined simply as:
@@ -226,6 +229,14 @@ where the value mapping function provides the database column value as a nullabl
         return ((EmployeePositionEnum)(int)value).ToString();
     }
 ```
+
+### Aliases
+
+Similar to the previous case, you may want to audit your columns or tables with a more user-friendly name, for example, using `Employee Position` instead of `EmployeePositionId`.
+
+To achieve this easily, you can provide a column alias in the `.AuditColumn` function or in `ConfigureTableAudit` for table aliases.
+
+These aliases will be available in the `RowAuditInfo` and `ColumnRowAuditInfo` classes, so you can use them when creating the audit trail in `MyAuditMappingCallBackAsync`.
 
 ## Dependencies
 
