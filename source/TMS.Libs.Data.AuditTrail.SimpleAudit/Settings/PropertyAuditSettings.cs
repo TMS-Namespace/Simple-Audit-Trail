@@ -11,7 +11,7 @@
             PropertyName = propertyName;
             ColumnSQLName = columnSQLName;
             DataType = dataType;
-            DataSQLType = dataSQLType;
+            DataSQLTypeName = dataSQLType;
         }
 
         public string PropertyName { get; private init; }
@@ -24,6 +24,6 @@
 
         public Type DataType { get; private init; }
 
-        public string DataSQLType { get; private init; }
+        public string DataSQLTypeName { get; private init; }
     }
 }

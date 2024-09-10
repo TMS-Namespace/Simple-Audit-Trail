@@ -19,7 +19,9 @@ public sealed class AuditTrailConfiguration<TAuditTrailModel>
     #region Private
 
     private async Task<object?> AuditMappingCallBackAsync(RowAuditInfo rowAuditInfo, object? customAuditInfo, CancellationToken cancellationToken)
-        // this is a trick to be able to define AuditMappingCallBackAsync as a variable on the SimpleAuditContext class level while stay ignorant about TAuditTrailModel generic type, and to avoid using reflection during invoking the call back.
+        // this is a trick to be able to define AuditMappingCallBackAsync as a variable on the
+        // AuditSettings class level while stay ignorant about TAuditTrailModel generic type, and
+        // to avoid using reflection during invoking the call back.
         => await this._auditMappingCallBackAsync(rowAuditInfo, customAuditInfo, cancellationToken);
 
     #endregion

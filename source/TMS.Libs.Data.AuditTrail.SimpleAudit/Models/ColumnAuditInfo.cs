@@ -1,30 +1,45 @@
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using TMS.Libs.Data.AuditTrail.SimpleAudit.Settings;
+
 namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
 
 public sealed class ColumnAuditInfo
 {
     internal ColumnAuditInfo(
-        string columnSQLName,
+        /*string columnSQLName,
         string propertyName,
         Type dataType,
         string dataSQLType,
-        string? columnAlias)
+        string? columnAlias,*/
+        PropertyEntry trackingPropertyEntry,
+        RowAuditInfo rowAuditInfo,
+        PropertyAuditSettings propertyAuditSettings)
     {
-        this.ColumnSQLName = columnSQLName;
+        /*this.ColumnSQLName = columnSQLName;
         this.PropertyName = propertyName;
         this.DataType = dataType;
         this.DataSQLTypeName = dataSQLType;
-        this.ColumnNameAlias = columnAlias;
+        this.ColumnNameAlias = columnAlias;*/
+        this.TrackingPropertyEntry = trackingPropertyEntry;
+        this.RowAuditInfo = rowAuditInfo;
+        this.AuditSettings = propertyAuditSettings;
     }
 
-    public string ColumnSQLName { get; private init; }
+    internal PropertyEntry TrackingPropertyEntry { get; private init; }
 
-    public string PropertyName { get; private init; }
+    internal RowAuditInfo RowAuditInfo { get; private init; }
 
-    public string? ColumnNameAlias { get; private init; }
+    internal PropertyAuditSettings AuditSettings { get; private init; }
 
-    public Type DataType { get; private init; }
+    public string ColumnSQLName => AuditSettings.ColumnSQLName;
 
-    public string DataSQLTypeName { get; private init; }
+    public string PropertyName => AuditSettings.PropertyName;
+
+    public string? ColumnNameAlias => AuditSettings.ColumnNameAlias;
+
+    public Type DataType => AuditSettings.DataType;
+
+    public string DataSQLTypeName => AuditSettings.DataSQLTypeName;
 
     public object? OldValue { get; internal set; }
 

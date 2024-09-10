@@ -22,20 +22,27 @@ internal static class Mapper
     public static RowAuditInfo ToModel(
         EntityEntry entityEntry,
         EntityAuditSettings entitySettings)
-    => new (
-            entitySettings.TableSQLName,
+    => new(
+            // entitySettings.TableSQLName,
             Mapper.ToModel(entityEntry.State),
-            entitySettings.ModelType,
             entityEntry,
-            entitySettings.TableAlias);
+            entitySettings);
+            //entitySettings.ModelType,
+            //entityEntry,
+            // entitySettings.TableAlias,
+            //rowModel);
 
     public static ColumnAuditInfo ToModel(
         PropertyEntry propertyEntry,
-        PropertyAuditSettings propertySettings)
+        PropertyAuditSettings propertySettings,
+        RowAuditInfo rowAuditInfo)
     => new (
-            propertySettings.ColumnSQLName,
+           /* propertySettings.ColumnSQLName,
             propertyEntry.Metadata.Name,
             propertyEntry.Metadata.ClrType,
-            propertySettings.DataSQLType,
-            propertySettings.ColumnNameAlias);
+            propertySettings.DataSQLTypeName,
+            propertySettings.ColumnNameAlias,*/
+            propertyEntry,
+            rowAuditInfo,
+            propertySettings);
 }

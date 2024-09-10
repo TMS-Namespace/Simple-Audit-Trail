@@ -27,7 +27,8 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests
             var dbContext = GetContext();
 
             // assert
-            Assertion.AssertThrow(dbContext, (ctx) => ctx.AuditingIsEnabled = true);
+            Assertion.AssertThrow(dbContext, (ctx) =>
+                ctx.AuditingIsEnabled = true);
 
             Assertion.AssertThrow(dbContext, (ctx) =>
             {
@@ -82,7 +83,7 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Tests
             });
 
         [Fact]
-        public void Should_Throw_On_Wrong_Column_To_Audit()
+        public void Should_Throw_On_Bad_Column_To_Audit()
         =>
             Assertion.AssertThrow(GetContext(), (ctx) =>
             {

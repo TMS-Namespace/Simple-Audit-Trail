@@ -198,10 +198,10 @@ public sealed class TableAuditConfiguration<TTableModel>
     /// <param name="valueMapperCallBack">A call back to map values of this column.</param>
     /// <returns></returns>
     public TableAuditConfiguration<TTableModel>
-       AuditColumn(
-       Expression<Func<TTableModel, object?>> includedColumn,
-       Func<object?, object?>? valueMapperCallBack = null,
-       string? columnAlias = null)
+        AuditColumn(
+        Expression<Func<TTableModel, object?>> includedColumn,
+        Func<object?, object?>? valueMapperCallBack = null,
+        string? columnAlias = null)
     {
         var propertiesNames = this.ValidateAndGetProperties([includedColumn])
                             .Select(p => p.Name)

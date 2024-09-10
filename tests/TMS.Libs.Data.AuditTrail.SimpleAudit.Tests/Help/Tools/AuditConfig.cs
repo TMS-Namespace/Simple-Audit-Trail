@@ -34,7 +34,7 @@ public class AuditConfig
         {
             dbContext
                 .ConfigureAuditTrail(this.AuditMappingCallBackAsync)
-                    .AuditAllTables(AutoExcludeColumnType.All)
+                    .AuditAllTables(AutoExcludeColumnType.AllSpecial)
                     .ConfigureTableAudit<NotAuditableTableModel>()
                         .ExcludeTableFromAuditing()
                     .ConfigureTableAudit<AuditableTableModel>(AuditableTableAlias)
@@ -75,7 +75,7 @@ public class AuditConfig
         var customInfo = customAuditInfo as CustomAuditInfo
             ?? new() { UserName = "System", IpAddress = "127.0.0.1" };
 
-        if (auditInfo.ModelType == typeof(AuditableTableModel))
+        if (auditInfo.RowModel.GetType() == typeof(AuditableTableModel))
         {
             var changesJson = await Serializing
                 .SerializeAsync(

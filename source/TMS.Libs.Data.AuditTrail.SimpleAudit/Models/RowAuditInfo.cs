@@ -1,31 +1,40 @@
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using System.Collections.ObjectModel;
+using TMS.Libs.Data.AuditTrail.SimpleAudit.Settings;
 
 namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
 
 public sealed class RowAuditInfo
 {
     internal RowAuditInfo(
-        string tableSQLName,
+        //string tableSQLName,
         AuditAction action,
-        Type modelType,
+        //Type modelType,
         EntityEntry trackingEntityEntry,
-        string? alias)
+        //string? alias,
+        EntityAuditSettings entityAuditSettings)
+        //object rowModel)
     {
-        this.ModelType = modelType;
-        this.TableSQLName = tableSQLName;
+        //this.ModelType = modelType;
+        //this.RowModel = rowModel;
+        //this.TableSQLName = tableSQLName;
         this.Action = action;
         this.TrackingEntityEntry = trackingEntityEntry;
-        this.TableNameAlias = alias;
+        //this.TableNameAlias = alias;
+        this.AuditSettings = entityAuditSettings;
     }
 
     internal EntityEntry TrackingEntityEntry { get; private init; }
 
-    public Type ModelType { get; private init; }
+    internal EntityAuditSettings AuditSettings { get; private init; }
 
-    public string TableSQLName { get; private init; }
+    //public Type ModelType { get; private init; }
 
-    public string? TableNameAlias { get; private init; }
+    public object RowModel => TrackingEntityEntry.Entity;
+
+    public string TableSQLName => AuditSettings.TableSQLName;
+
+    public string? TableNameAlias => AuditSettings.TableAlias;
 
     public AuditAction Action { get; private init; }
 

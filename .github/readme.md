@@ -86,18 +86,18 @@ dbContext
     .ConfigureAuditTrail<MyAuditTrailModel>(MyAuditMappingCallBackAsync)
         // configure how 'MyTableModel1' should be audited
         .ConfigureTableAudit<MyTableModel1>()
-        // start with tracking all table columns except primary and foreign keys
-        .AuditAllColumns(AutoExcludeColumnType.PrimaryKey | AutoExcludeColumnType.ForeignKey)
-        // but also exclude those two
-        .ExcludeColumns(
-            tbl => tbl.Column3,
-            tbl => tbl.Column4)
-        // configure how 'MyTableModel2' should be audited
+            // start with tracking all table columns except primary and foreign keys
+            .AuditAllColumns(AutoExcludeColumnType.PrimaryKey | AutoExcludeColumnType.ForeignKey)
+            // but also exclude those two
+            .ExcludeColumns(
+                tbl => tbl.Column3,
+                tbl => tbl.Column4)
+            // configure how 'MyTableModel2' should be audited
         .ConfigureTableAudit<MyTableModel2>()
-        // audit only two of the columns
-        .AuditColumns(
-            tbl => tbl.Column1,
-            tbl => tbl.Column2)
+            // audit only two of the columns
+            .AuditColumns(
+                tbl => tbl.Column1,
+                tbl => tbl.Column2)
         // activate auditing immediately
         .StartAuditing();
 ```
@@ -169,6 +169,8 @@ var customInfo = new MyCustomAuditInfo()
 
 await dbContext.SaveChangesAsync(customInfo, cancellationToken);
 ```
+
+Before this, make sure to activate auditing by calling `.StartAuditing();` during configuration, or set `AuditingIsEnabled` property of `DBContext` to `true`.
 
 ### Dealing with Enums (Value Mapping)
 

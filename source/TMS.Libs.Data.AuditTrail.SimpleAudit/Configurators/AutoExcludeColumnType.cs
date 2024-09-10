@@ -11,5 +11,5 @@ public enum AutoExcludeColumnType
 
     Virtual = 1 << 2,
 
-    All = PrimaryKey | ForeignKey | Virtual,
+    AllSpecial = PrimaryKey | ForeignKey | Virtual,
 }
