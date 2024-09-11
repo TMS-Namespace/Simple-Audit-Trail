@@ -201,6 +201,8 @@ public abstract class SimpleAuditContext : DbContext
     /// </summary>
     public bool CaptureContext { get; set; }
 
+    #region Constructors
+
     protected SimpleAuditContext(DbContextOptions<SimpleAuditContext> options)
         : base(options)
         => AuditSettings = new AuditSettings(this);
@@ -208,6 +210,11 @@ public abstract class SimpleAuditContext : DbContext
     protected SimpleAuditContext(DbContextOptions options)
         : base(options)
         => AuditSettings = new AuditSettings(this);
+
+    protected SimpleAuditContext()
+        => AuditSettings = new AuditSettings(this);
+
+    #endregion
 
     /// <summary>
     /// The type of the model which is used for audit trail.
