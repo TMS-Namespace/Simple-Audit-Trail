@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Settings;
 
 namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
@@ -6,23 +7,13 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
 public sealed class ColumnAuditInfo
 {
     internal ColumnAuditInfo(
-        /*string columnSQLName,
-        string propertyName,
-        Type dataType,
-        string dataSQLType,
-        string? columnAlias,*/
         PropertyEntry trackingPropertyEntry,
         RowAuditInfo rowAuditInfo,
         PropertyAuditSettings propertyAuditSettings)
     {
-        /*this.ColumnSQLName = columnSQLName;
-        this.PropertyName = propertyName;
-        this.DataType = dataType;
-        this.DataSQLTypeName = dataSQLType;
-        this.ColumnNameAlias = columnAlias;*/
-        this.TrackingPropertyEntry = trackingPropertyEntry;
-        this.RowAuditInfo = rowAuditInfo;
-        this.AuditSettings = propertyAuditSettings;
+        TrackingPropertyEntry = trackingPropertyEntry;
+        RowAuditInfo = rowAuditInfo;
+        AuditSettings = propertyAuditSettings;
     }
 
     internal PropertyEntry TrackingPropertyEntry { get; private init; }

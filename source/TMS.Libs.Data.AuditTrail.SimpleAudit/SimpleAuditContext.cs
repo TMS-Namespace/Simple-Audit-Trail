@@ -14,8 +14,8 @@ public abstract class SimpleAuditContext : DbContext
 
     private bool _auditingIsEnabled;
 
-    // we will keep a list of generate audit trails to clean DBContext in case of failure.
-    private readonly List<object> _auditTrailsCache = [];
+    // We will keep a list of generated audit trails to clean DBContext in case of failure.
+    private readonly HashSet<object> _auditTrailsCache = [];
 
     #endregion
 
@@ -25,39 +25,40 @@ public abstract class SimpleAuditContext : DbContext
     {
         var rowsAuditInfos = new List<RowAuditInfo>();
 
-        if (!this.AuditingIsEnabled)
+        if (!AuditingIsEnabled)
         {
             return rowsAuditInfos;
         }
 
-        this.ChangeTracker.DetectChanges();
+        ChangeTracker.DetectChanges();
 
-        // check if there is anything that worth to audit
-        var changedEntries = this.ChangeTracker
+        // Check if there is anything that is worth auditing
+        var changedEntries = ChangeTracker
             .Entries()
             .Where(IsEntryHasWhatToAudit);
 
         foreach (var entityEntry in changedEntries)
         {
-            // check if we have any settings for this entry
-            var entitySettings = this.AuditSettings.Get(entityEntry.Entity.GetType());
+            // Check if we have any settings for this entry
+            var entitySettings = AuditSettings.Get(entityEntry.Entity.GetType());
 
-            if (entitySettings is null) // no settings for this entity is set
+            if (entitySettings is null) // No settings for this entity are set
             {
                 continue;
             }
 
-            // create row audit info
+            // Create row audit info
             var rowAuditInfo = Mapper.ToModel(entityEntry, entitySettings);
 
             var columnsAuditInfo = entityEntry
                 .Properties
                 .Select(pe => GetColumnAuditInfos(entitySettings, entityEntry, pe, rowAuditInfo))
-                .Where(cai =>  cai != null);
+                .Where(cai => cai != null)
+                .ToList();
 
-            // if no columns are worth tracking, then skip this entity
-            if (columnsAuditInfo is not null && columnsAuditInfo.Any())
-            {            
+            // If no columns are worth tracking, then skip this entity
+            if (columnsAuditInfo.Any())
+            {
                 rowAuditInfo.ColumnsAuditInfos.AddRange(columnsAuditInfo!);
                 rowsAuditInfos.Add(rowAuditInfo);
             }
@@ -72,24 +73,17 @@ public abstract class SimpleAuditContext : DbContext
         PropertyEntry propertyEntry,
         RowAuditInfo rowAuditInfo)
     {
-        var propertySettings = this.AuditSettings.Get(entitySettings, propertyEntry.Metadata.Name);
+        var propertySettings = AuditSettings.Get(entitySettings, propertyEntry.Metadata.Name);
 
-        // check if the property has settings, and its value actually is changed
+        // Check if the property has settings, and its value actually is changed
         if (propertySettings is not null && IsPropertyValueChanged(entityEntry, propertyEntry))
         {
-            // create column audit info
+            // Create column audit info
             var columnChange = Mapper.ToModel(propertyEntry, propertySettings, rowAuditInfo);
 
             // EF assigns to Original value same value as new value on insertion
             columnChange.OldValue = entityEntry.State == EntityState.Added ? null : propertyEntry.OriginalValue;
             columnChange.NewValue = entityEntry.State == EntityState.Deleted ? null : propertyEntry.CurrentValue;
-
-            // apply value mappers if any
-            if (propertySettings.ValueMapper != null)
-            {
-                columnChange.OldValue = propertySettings.ValueMapper(columnChange.OldValue);
-                columnChange.NewValue = propertySettings.ValueMapper(columnChange.NewValue);
-            }
 
             return columnChange;
         }
@@ -105,13 +99,13 @@ public abstract class SimpleAuditContext : DbContext
 
     private static bool IsPropertyValueChanged(EntityEntry entityEntry, PropertyEntry propertyEntry)
     {
-        // if we inserting, EF considers all columns as modified
+        // If we are inserting, EF considers all columns as modified
         if (entityEntry.State == EntityState.Added)
         {
             return propertyEntry.CurrentValue is not null;
         }
 
-        // if we deleting, we considers all columns as modified, to keep record of deleted information
+        // If we are deleting, we consider all columns as modified, to keep a record of deleted information
         if (entityEntry.State == EntityState.Deleted)
         {
             return true;
@@ -122,30 +116,30 @@ public abstract class SimpleAuditContext : DbContext
 
     private void UpdateAuditInfoChangedValues(RowAuditInfo rowAuditInfo)
     {
-        var columnsToSkip = new List<ColumnAuditInfo>();
+        var columnsToSkip = new HashSet<ColumnAuditInfo>();
 
-        foreach(var columnAuditInfo in rowAuditInfo.ColumnsAuditInfos)
+        foreach (var columnAuditInfo in rowAuditInfo.ColumnsAuditInfos)
         {
             columnAuditInfo.NewValue = rowAuditInfo.Action == AuditAction.Deleted ? null : columnAuditInfo.TrackingPropertyEntry.CurrentValue;
 
-            // apply value mappers if any
+            // Apply value mappers if any
             if (columnAuditInfo.AuditSettings.ValueMapper != null)
             {
                 columnAuditInfo.OldValue = columnAuditInfo.AuditSettings.ValueMapper(columnAuditInfo.OldValue);
                 columnAuditInfo.NewValue = columnAuditInfo.AuditSettings.ValueMapper(columnAuditInfo.NewValue);
             }
 
-            // if the value did not change, we exclude the column from auditing
-            if (columnAuditInfo.NewValue == columnAuditInfo.OldValue)
+            // If the value did not change, we exclude the column from auditing
+            if (Equals(columnAuditInfo.NewValue, columnAuditInfo.OldValue))
             {
                 columnsToSkip.Add(columnAuditInfo);
             }
         }
 
-        rowAuditInfo.ColumnsAuditInfos.RemoveAll( c=> columnsToSkip.Contains(c));
+        rowAuditInfo.ColumnsAuditInfos.RemoveAll(c => columnsToSkip.Contains(c));
 
-
-        if (rowAuditInfo.ColumnsChanges.Any())
+        // Setup the reference key
+        if (rowAuditInfo.ColumnsChanges.Count > 0)
         {
             var primaryKey = rowAuditInfo
                     .ColumnsChanges[0]
@@ -163,31 +157,19 @@ public abstract class SimpleAuditContext : DbContext
         object? customAuditInfo,
         CancellationToken cancellationToken)
     {
-        /*if (rowsAuditInfo == null || rowsAuditInfo.Count == 0)
-        {
-            return;
-        }*/
-
         foreach (var rowAuditInfo in rowsAuditInfo)
         {
-            // this is called after saving the outer changes, so if new rows inserted, we should now have the actual values for primary keys in case of auto-increment
-            /*var primaryKey = rowAuditInfo
-                .TrackingEntityEntry
-                .Properties
-                .First(p => p.Metadata.IsPrimaryKey());
-
-            rowAuditInfo.PrimaryKeyValue = primaryKey.CurrentValue!;*/
-
-            var auditRecord = await this.AuditSettings
-                .AuditMappingCallBackAsync!(rowAuditInfo, customAuditInfo, cancellationToken);
+            var auditRecord = await AuditSettings
+                .AuditMappingCallBackAsync!(rowAuditInfo, customAuditInfo, cancellationToken)
+                .ConfigureAwait(CaptureContext);
 
             if (auditRecord != null)
             {
-                if (auditRecord.GetType() == this.AuditTrailTableModelType)
+                if (auditRecord.GetType() == AuditTrailTableModelType)
                 {
-                    this._auditTrailsCache.Add(auditRecord);
+                    _auditTrailsCache.Add(auditRecord);
 
-                    this.Add(auditRecord);
+                    Add(auditRecord);
 
                     continue;
                 }
@@ -197,13 +179,12 @@ public abstract class SimpleAuditContext : DbContext
                 continue;
             }
 
-            throw new InvalidOperationException($"{nameof(this.AuditSettings
-                .AuditMappingCallBackAsync)} should return a Task<TAuditTrailModel?>.");
+            throw new InvalidOperationException($"{nameof(AuditSettings.AuditMappingCallBackAsync)} should return a Task<TAuditTrailModel?>.");
         }
 
-        var savedCount = await base.SaveChangesAsync(cancellationToken);
+        var savedCount = await base.SaveChangesAsync(cancellationToken).ConfigureAwait(CaptureContext);
 
-        if (savedCount != this._auditTrailsCache.Count)
+        if (savedCount != _auditTrailsCache.Count)
         {
             throw new InvalidOperationException("Something went wrong, not all audit trail records are saved.");
         }
@@ -215,18 +196,24 @@ public abstract class SimpleAuditContext : DbContext
 
     public AuditSettings AuditSettings { get; private set; }
 
+    /// <summary>
+    /// Determines if the context should capture the context of the current change, usually should be True when used in UI contexts
+    /// </summary>
+    public bool CaptureContext { get; set; }
+
     protected SimpleAuditContext(DbContextOptions<SimpleAuditContext> options)
         : base(options)
-    => this.AuditSettings = new AuditSettings(this);
+        => AuditSettings = new AuditSettings(this);
 
     protected SimpleAuditContext(DbContextOptions options)
         : base(options)
-    => this.AuditSettings = new AuditSettings(this);
+        => AuditSettings = new AuditSettings(this);
 
     /// <summary>
     /// The type of the model which is used for audit trail.
     /// </summary>
-    public Type? AuditTrailTableModelType => this.AuditSettings.AuditTrailTableModelType;
+    public Type? AuditTrailTableModelType
+        => AuditSettings.AuditTrailTableModelType;
 
     /// <summary>
     /// Configures the auditing table, auditing mapping callback, and specifies which tables/columns should be audited.
@@ -259,9 +246,9 @@ public abstract class SimpleAuditContext : DbContext
     public TableAuditConfiguration<TTableModel> ConfigureTableAudit<TTableModel>(string? tableAlias = null)
         where TTableModel : class
     {
-        this.AuditSettings.ValidateIfAuditingConfigured();
+        AuditSettings.ValidateIfAuditingConfigured();
 
-        return new(this, tableAlias);
+        return new TableAuditConfiguration<TTableModel>(this, tableAlias);
     }
 
     /// <summary>
@@ -269,79 +256,95 @@ public abstract class SimpleAuditContext : DbContext
     /// </summary>
     public bool AuditingIsEnabled
     {
-        get => this._auditingIsEnabled;
+        get => _auditingIsEnabled;
         set
         {
-            if (value) // check only if we enabling auditing
+            if (value) // Check only if we are enabling auditing
             {
-                this.AuditSettings.ValidateIfAuditingConfigured();
+                AuditSettings.ValidateIfAuditingConfigured();
 
-                if (!this.AuditSettings.HasEntitiesSettings)
+                if (!AuditSettings.HasEntitiesSettings)
                 {
                     throw new InvalidOperationException("No tables are set for auditing.");
                 }
             }
 
-            this._auditingIsEnabled = value;
+            _auditingIsEnabled = value;
         }
     }
 
     #region Saving
 
     public override int SaveChanges()
-        => this.SaveChangesAsync().GetAwaiter().GetResult();
+        => SaveChangesAsync()
+        .GetAwaiter()
+        .GetResult();
 
     public int SaveChanges(object? customProperties)
-        => this.SaveChangesAsync(customProperties, CancellationToken.None).GetAwaiter().GetResult();
+        => SaveChangesAsync(customProperties, CancellationToken.None)
+        .GetAwaiter()
+        .GetResult();
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-        => await this.SaveChangesAsync(null, cancellationToken);
+        => await SaveChangesAsync(null, cancellationToken)
+        .ConfigureAwait(CaptureContext);
 
     public async Task<int> SaveChangesAsync(object? customAuditInfo)
-        => await this.SaveChangesAsync(customAuditInfo, CancellationToken.None);
+        => await SaveChangesAsync(customAuditInfo, CancellationToken.None)
+        .ConfigureAwait(CaptureContext);
 
     public async Task<int> SaveChangesAsync(object? customAuditInfo, CancellationToken cancellationToken)
     {
-        var rowsAuditInfos = this.GetRowsAuditInfo();
+        var rowsAuditInfos = GetRowsAuditInfo();
 
-        if (rowsAuditInfos.Count == 0) // no audit trail needed
+        if (rowsAuditInfos.Count == 0) // No audit trail needed
         {
-            return await base.SaveChangesAsync(cancellationToken);
+            return await base
+                .SaveChangesAsync(cancellationToken)
+                .ConfigureAwait(CaptureContext);
         }
 
-        using var transaction = await this.Database.BeginTransactionAsync(cancellationToken);
+        using var transaction = await Database
+            .BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(CaptureContext);
 
         try
         {
-            var result = await base.SaveChangesAsync(cancellationToken);
+            var result = await base
+                .SaveChangesAsync(cancellationToken)
+                .ConfigureAwait(CaptureContext);
 
+            // Update all values in audit info objects
+            rowsAuditInfos.ForEach(UpdateAuditInfoChangedValues);
 
-            // update all values in audit info objects
-            rowsAuditInfos.ForEach(this.UpdateAuditInfoChangedValues);
-
-            // filter out not changed
+            // Filter out not changed
             rowsAuditInfos = rowsAuditInfos
                 .Where(rai => rai.ColumnsChanges.Count > 0)
                 .ToList();
 
-            if (rowsAuditInfos.Count > 0) // perform audit if needed
+            if (rowsAuditInfos.Count > 0) // Perform audit if needed
             {
-                await this.PerformAuditingAsync(rowsAuditInfos, customAuditInfo, cancellationToken);
+                await PerformAuditingAsync(rowsAuditInfos, customAuditInfo, cancellationToken)
+                    .ConfigureAwait(CaptureContext);
             }
 
-            await transaction.CommitAsync(cancellationToken);
+            await transaction
+                .CommitAsync(cancellationToken)
+                .ConfigureAwait(CaptureContext);
 
-            this._auditTrailsCache.Clear();
+            _auditTrailsCache.Clear();
 
             return result;
         }
-        catch
+        catch (Exception)
         {
-            await transaction.RollbackAsync(cancellationToken);
+            await transaction
+                .RollbackAsync(cancellationToken)
+                .ConfigureAwait(CaptureContext);
 
-            // clean up DB Context from the generated trails
-            this.RemoveRange(this._auditTrailsCache);
-            this._auditTrailsCache.Clear();
+            // Clean up DB Context from the generated trails
+            RemoveRange(_auditTrailsCache);
+            _auditTrailsCache.Clear();
 
             throw;
         }

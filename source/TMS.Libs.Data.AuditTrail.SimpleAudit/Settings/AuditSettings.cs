@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Help;
 using TMS.Libs.Data.AuditTrail.SimpleAudit.Models;
 
@@ -8,7 +9,7 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Settings
     {
         #region Vars
 
-        private readonly List<EntityAuditSettings> _entitiesSettings = [];
+        private readonly Dictionary<Type, EntityAuditSettings> _entitiesSettings = new();
         private readonly SimpleAuditContext _dbContext;
 
         #endregion
@@ -16,7 +17,7 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Settings
         #region Private
 
         private PropertyAuditSettings GetPropertySettings(Type type, string propertyName)
-        => new (
+            => new(
                 propertyName,
                 _dbContext.GetSQLColumnName(type, propertyName),
                 _dbContext.GetColumnType(type, propertyName),
@@ -30,43 +31,40 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Settings
         #region Internal
 
         internal AuditSettings(SimpleAuditContext context)
-        => _dbContext = context;
+            => _dbContext = context;
+
         internal bool ValidateIfAuditingConfigured()
         {
-            if (this.AuditTrailTableModelType is null || this.AuditMappingCallBackAsync is null)
+            if (AuditTrailTableModelType is null || AuditMappingCallBackAsync is null)
             {
                 throw new InvalidOperationException("Auditing is not configured yet.");
             }
             return true;
         }
 
-
-        internal bool HasEntitiesSettings => this._entitiesSettings.Count > 0;
+        internal bool HasEntitiesSettings => _entitiesSettings.Count > 0;
 
         internal EntityAuditSettings? Get(Type type)
-        => _entitiesSettings
-            .SingleOrDefault(s => s.ModelType == type);
+            => _entitiesSettings
+                .TryGetValue(type, out var settings) ? settings : null;
 
         internal PropertyAuditSettings? Get(EntityAuditSettings entitySettings, string name)
             => entitySettings
                 .AuditableProperties
                 .SingleOrDefault(ap => ap.PropertyName == name);
 
-
         /// <summary>
         /// Add or update table model and list of properties to Audit.
         /// </summary>
-        /// <param name="type"></param>
-        /// <param name="tableAlias"></param>
-        /// <param name="propertiesNames"></param>
-        internal void Set(Type type, string? tableAlias, List<string> propertiesNames)
+        internal void Set(
+            Type type, 
+            string? tableAlias, 
+            List<string> propertiesNames)
         {
-            var entitySettings = Get(type);
-
-            if (entitySettings == null)
+            if (!_entitiesSettings.TryGetValue(type, out var entitySettings))
             {
                 entitySettings = GetEntitySettings(type);
-                _entitiesSettings.Add(entitySettings);
+                _entitiesSettings[type] = entitySettings;
             }
 
             entitySettings.TableAlias = tableAlias;
@@ -74,70 +72,54 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Settings
             foreach (var propertyName in propertiesNames)
             {
                 var propertySettings = Get(entitySettings, propertyName);
-
+                        
                 if (propertySettings == null)
                 {
                     propertySettings = GetPropertySettings(type, propertyName);
                     entitySettings.AuditableProperties.Add(propertySettings);
                 }
-
                 propertySettings.ValueMapper = null;
                 propertySettings.ColumnNameAlias = null;
             }
         }
 
-
         /// <summary>
         /// Add or update the Audit settings for table model and singly property, with fine tunning.
         /// </summary>
-        /// <param name="type"></param>
-        /// <param name="tableAlias"></param>
-        /// <param name="propertyName"></param>
-        /// <param name="valueMapper"></param>
-        /// <param name="columnAlias"></param>
         internal void Set(
-            Type type,
-            string? tableAlias,
-            string propertyName,
-            Func<object?, object?>? valueMapper,
+            Type type, 
+            string? tableAlias, 
+            string propertyName, 
+            Func<object?, object?>? valueMapper, 
             string? columnAlias)
         {
-            var entitySettings = Get(type);
-
-            if (entitySettings == null)
+            if (!_entitiesSettings.TryGetValue(type, out var entitySettings))
             {
                 entitySettings = GetEntitySettings(type);
-                _entitiesSettings.Add(entitySettings);
+                _entitiesSettings[type] = entitySettings;
             }
 
             entitySettings.TableAlias = tableAlias;
 
-            var propertySettings = entitySettings
-                .AuditableProperties
-                .SingleOrDefault(ps => ps.PropertyName == propertyName);
-
+            var propertySettings = Get(entitySettings, propertyName);
             if (propertySettings == null)
             {
                 propertySettings = GetPropertySettings(type, propertyName);
                 entitySettings.AuditableProperties.Add(propertySettings);
             }
-
             propertySettings.ValueMapper = valueMapper;
             propertySettings.ColumnNameAlias = columnAlias;
         }
 
-
         /// <summary>
         /// Remove table model from Audit.
         /// </summary>
-        /// <param name="type"></param>
-        /// <exception cref="InvalidOperationException"></exception>
         internal void Remove(Type type)
         {
-            var entitySettings = Get(type)
-                ?? throw new InvalidOperationException($"The table {type.Name} is not yet configured for audit.");
-
-            _entitiesSettings.Remove(entitySettings);
+            if (!_entitiesSettings.Remove(type))
+            {
+                throw new InvalidOperationException($"The table {type.Name} is not yet configured for audit.");
+            }
 
             if (_entitiesSettings.Count == 0)
             {
@@ -145,17 +127,12 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Settings
             }
         }
 
-
-        /// <summary>
-        /// Remove properties of table model from Audit.
-        /// </summary>
-        /// <param name="type"></param>
-        /// <param name="propertiesNames"></param>
-        /// <exception cref="InvalidOperationException"></exception>
         internal void Remove(Type type, List<string> propertiesNames)
         {
-            var entitySettings = Get(type)
-                ?? throw new InvalidOperationException($"The table {type.Name} is not yet configured for audit.");
+            if (!_entitiesSettings.TryGetValue(type, out var entitySettings))
+            {
+                throw new InvalidOperationException($"The table {type.Name} is not yet configured for audit.");
+            }
 
             foreach (var propertyName in propertiesNames)
             {
@@ -176,7 +153,7 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Settings
         #region Public
 
         public ReadOnlyCollection<EntityAuditSettings> EntityAuditSettings
-            => _entitiesSettings.AsReadOnly();
+            => new(_entitiesSettings.Values.ToList());
 
         public Type? AuditTrailTableModelType { get; internal set; }
 

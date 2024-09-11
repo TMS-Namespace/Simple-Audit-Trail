@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
+
 using System.Linq.Expressions;
 
 namespace TMS.Libs.Data.AuditTrail.SimpleAudit.Help;
 
-public static class Extensions
+internal static class Extensions
 {
     #region Internal
 

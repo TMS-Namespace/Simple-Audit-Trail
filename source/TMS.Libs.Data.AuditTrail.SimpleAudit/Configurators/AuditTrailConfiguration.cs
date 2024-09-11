@@ -19,10 +19,10 @@ public sealed class AuditTrailConfiguration<TAuditTrailModel>
     #region Private
 
     private async Task<object?> AuditMappingCallBackAsync(RowAuditInfo rowAuditInfo, object? customAuditInfo, CancellationToken cancellationToken)
-        // this is a trick to be able to define AuditMappingCallBackAsync as a variable on the
-        // AuditSettings class level while stay ignorant about TAuditTrailModel generic type, and
-        // to avoid using reflection during invoking the call back.
-        => await this._auditMappingCallBackAsync(rowAuditInfo, customAuditInfo, cancellationToken);
+        // This is a trick to define AuditMappingCallBackAsync as a variable on the
+        // AuditSettings class level while staying ignorant about TAuditTrailModel generic type,
+        // and to avoid using reflection during invoking the callback.
+        => await _auditMappingCallBackAsync(rowAuditInfo, customAuditInfo, cancellationToken);
 
     #endregion
 
@@ -37,12 +37,12 @@ public sealed class AuditTrailConfiguration<TAuditTrailModel>
             throw new InvalidOperationException($"The type {typeof(TAuditTrailModel).Name} is not recognized as a table model.");
         }
 
-        this._dbContext = dbContext;
+        _dbContext = dbContext;
 
-        this._dbContext.AuditSettings.AuditTrailTableModelType = typeof(TAuditTrailModel);
+        _dbContext.AuditSettings.AuditTrailTableModelType = typeof(TAuditTrailModel);
 
-        this._auditMappingCallBackAsync = auditMappingCallBackAsync;
-        this._dbContext.AuditSettings.AuditMappingCallBackAsync = this.AuditMappingCallBackAsync;
+        _auditMappingCallBackAsync = auditMappingCallBackAsync;
+        _dbContext.AuditSettings.AuditMappingCallBackAsync = AuditMappingCallBackAsync;
     }
 
     #endregion
@@ -51,21 +51,21 @@ public sealed class AuditTrailConfiguration<TAuditTrailModel>
 
     public AuditTrailConfiguration<TAuditTrailModel> StartAuditing()
     {
-        this._dbContext.AuditingIsEnabled = true;
+        _dbContext.AuditingIsEnabled = true;
 
         return this;
     }
 
     public TableAuditConfiguration<TTableModel> ConfigureTableAudit<TTableModel>(string? tableAlias = null)
         where TTableModel : class
-        => new(this._dbContext, tableAlias);
+        => new(_dbContext, tableAlias);
 
     public AuditTrailConfiguration<TAuditTrailModel> AuditAllTables(AutoExcludeColumnType exclusions = AutoExcludeColumnType.None)
     {
         var entityTypes = _dbContext.Model.GetEntityTypes()
                     .Select(e => e.ClrType)
                     .Where(e => e != typeof(TAuditTrailModel)
-                            && this._dbContext.IsTableType(e));
+                            && _dbContext.IsTableType(e));
 
         var methodName = nameof(TableAuditConfiguration<TAuditTrailModel>.AuditAllColumns);
 
@@ -79,7 +79,7 @@ public sealed class AuditTrailConfiguration<TAuditTrailModel>
                     [typeof(SimpleAuditContext), typeof(string)],
                     null);
 
-            var instance = constructor!.Invoke([this._dbContext, null]);
+            var instance = constructor!.Invoke([_dbContext, null]);
 
             var executeMethod = genericType.GetMethod(methodName);
 
