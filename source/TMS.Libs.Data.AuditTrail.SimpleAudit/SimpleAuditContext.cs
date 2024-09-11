@@ -10,7 +10,7 @@ namespace TMS.Libs.Data.AuditTrail.SimpleAudit;
 
 public abstract class SimpleAuditContext : DbContext
 {
-    #region Vars
+    #region Fields
 
     private bool _auditingIsEnabled;
 
@@ -19,7 +19,7 @@ public abstract class SimpleAuditContext : DbContext
 
     #endregion
 
-    #region Private
+    #region Private Functions
 
     private List<RowAuditInfo> GetRowsAuditInfo()
     {
@@ -57,7 +57,7 @@ public abstract class SimpleAuditContext : DbContext
                 .ToList();
 
             // If no columns are worth tracking, then skip this entity
-            if (columnsAuditInfo.Any())
+            if (columnsAuditInfo.Count > 0)
             {
                 rowAuditInfo.ColumnsAuditInfos.AddRange(columnsAuditInfo!);
                 rowsAuditInfos.Add(rowAuditInfo);
@@ -129,14 +129,15 @@ public abstract class SimpleAuditContext : DbContext
                 columnAuditInfo.NewValue = columnAuditInfo.AuditSettings.ValueMapper(columnAuditInfo.NewValue);
             }
 
-            // If the value did not change, we exclude the column from auditing
-            if (Equals(columnAuditInfo.NewValue, columnAuditInfo.OldValue))
+            // If the value did not change, we exclude the column from auditing, however, if we deleting, we keep the column
+            if (rowAuditInfo.Action != AuditAction.Deleted
+                && Equals(columnAuditInfo.NewValue, columnAuditInfo.OldValue))
             {
                 columnsToSkip.Add(columnAuditInfo);
             }
         }
 
-        rowAuditInfo.ColumnsAuditInfos.RemoveAll(c => columnsToSkip.Contains(c));
+        rowAuditInfo.ColumnsAuditInfos.RemoveAll(columnsToSkip.Contains);
 
         // Setup the reference key
         if (rowAuditInfo.ColumnsChanges.Count > 0)
@@ -192,7 +193,7 @@ public abstract class SimpleAuditContext : DbContext
 
     #endregion
 
-    #region Public
+    #region Public Functions
 
     public AuditSettings AuditSettings { get; private set; }
 
