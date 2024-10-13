@@ -4,16 +4,20 @@ A light, simple, and fast plug-and-play library to enable audit trails in any da
 
 ## Features
 
-- All audit trails will be saved to a (currently) single table.
-- Tables and columns that should be audited can be fully configured.
-- The mapping of the audit information to be saved is configurable.
-- Value mapping and aliases can be configured on a per-column basis.
+- Tables needed to be audited can be grouped and configured per each each group.
+- Tables and columns that should be audited can be fine tuned and fully configured.
+- How the final auditing record is generated is fully configurable.
+- Value mapping, aliases, and reference column can be configured on a per-column basis.
 - Custom audit information can be passed.
-- The audit trail will be saved along with all other changes in a single transaction and rolled back in case of any error.
-- Tables and columns are audited with their original SQL names, not the mapped EF model/property names.
-- Reflection is used only during configuration of audit trail.
+- A built in database context that will save audit trail in a single transaction with execution strategy support.
+- Provides the original SQL Tables and columns names, in additional to mapped EF model/property names.
+- Reflection is used directly only during configuration of audit trail.
 
-## Auditing details
+## Auditing Approach
+
+An auditable table should have at least one column with unique index, or primary key.
+
+A bunch of tables, that you want to have a shared audit trail table, should be put in one group.
 
 Below is a table that describes which actions are audited and when the old/new values are considered null:
 
@@ -27,16 +31,18 @@ Below is a table that describes which actions are audited and when the old/new v
 
 ### Setup
 
-Inherit your DataBase context from `SimpleAuditContext`:
+The simplest approach is to inherit `SimpleAuditContext` in your DataBase context, it will save the audit trail with your changes in a single transaction. Execution strategies are also supported, by default its success will be verified by checking if the audit trail records are saved correctly.
 
 ```csharp
-using TMS.Libs.Data.AuditTrail.SimpleAudit;
+using TMS.SimpleAudit;
 
 public partial class MyDbContext : SimpleAuditContext
 {
     ...
 }
 ```
+
+If you can't inherit, or your requirements needs a more complex setup, you can implement `SimpleAuditManager` main functionality (such as `OnBeforeSaving`, `OnAfterSaveAsync`, `OnFinalize`) into your own logic (see `SimpleAuditContext` source code for how to do that).
 
 For example, assuming that your audit table model is `MyAuditTrailModel` and defined as:
 
@@ -101,6 +107,8 @@ dbContext
         // activate auditing immediately
         .StartAuditing();
 ```
+
+Note that re-configuring the same table/column will overwrite the previous configuration.
 
 ### Mapping to your audit trail table
 
@@ -172,6 +180,14 @@ await dbContext.SaveChangesAsync(customInfo, cancellationToken);
 
 Before this, make sure to activate auditing by calling `.StartAuditing();` during configuration, or set `AuditingIsEnabled` property of `DBContext` to `true`.
 
+### Customizing the Reference Key
+
+### Flattening Audit Trail
+
+Depending on the use case, you may want to present one row changes by multiple audit trail records (e.g. a record per each column change).
+
+============
+
 ### Dealing with Enums (Value Mapping)
 
 If your database contains columns that, for example, store the integer values of your enums, but you want your audit trail to contain the enum item names instead of their integer values, you can use Value Mapping. This makes it more convenient to present the audit trails to the end user.
@@ -204,7 +220,7 @@ public enum EmployeePositionEnum
 }
 ```
 
-So instead of having integer values in the audit trail whenever `EmployeePosition` is set or updated, we want to store the actual position name. To achieve this, we slightly alter the previous audit configuration for this table as follows:
+So instead of having integer values in the audit trail whenever `EmployeePosition` is set or updated, we want to store the actual position name. To achieve this, we slightly alter the previous audit configuration for this table as follows
 
 ```csharp
 dbContext
@@ -227,10 +243,12 @@ where the value mapping function provides the database column value as a nullabl
         {
             return null;
         }
-        // we convert the integer value to the corresponding enum item name
+        // we convert the integer value to the corresponding enum item string
         return ((EmployeePositionEnum)(int)value).ToString();
     }
 ```
+
+Note that the specified value mapper is called twice per changed column: for new and old values. Moreover, if this mapper will return the same value for both new and old values, then we consider that this column actually has not changed, and hence it will be skipped from audit trail.
 
 ### Aliases
 
@@ -239,6 +257,18 @@ Similar to the previous case, you may want to audit your columns or tables with 
 To achieve this easily, you can provide a column alias in the `.AuditColumn` function or in `ConfigureTableAudit` for table aliases.
 
 These aliases will be available in the `RowAuditInfo` and `ColumnRowAuditInfo` classes, so you can use them when creating the audit trail in `MyAuditMappingCallBackAsync`.
+
+### Soft Deleting
+
+### Dealing With Retry Strategies
+
+If you configured your DBContext strategy to retry on connection errors, `SimpleAudit` will detect that, and use a different transaction and saving logic for that.
+
+A resilient approach to handle retries is to also handle transient errors during transactions commits (e.g. connection error that happened right after a commit, so that EF is not aware of commit success).
+
+`SimpleAudit` will automatically verify that the transaction was committed successfully by querying the database for one of audit trail records it generated.
+
+However, if no audit trail records are generated, `SimpleAudit` has no way to verify transaction success, and hence it is recommended to also submit (during `.SaveChangesAsync()` call) your custom function for success verification, that will be called only in case of audit trails absence.
 
 ## Dependencies
 

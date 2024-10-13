@@ -1,0 +1,172 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1" GroupingSetting="Access">
+  <Class Name="TMS.SimpleAudit.Auditing.AuditContextWrapper&lt;TContext&gt;">
+    <Position X="8.5" Y="2" Width="2" />
+    <TypeIdentifier>
+      <HashCode>ACAAAAQAAAAAAEAAAAAACAAAAAAAAAAIAAAAQAAAAAA=</HashCode>
+      <FileName>Auditing\AuditContextWrapper.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsAssociation>
+      <Property Name="AuditingManager" />
+    </ShowAsAssociation>
+  </Class>
+  <Class Name="TMS.SimpleAudit.Auditing.AuditingException">
+    <Position X="3" Y="1.25" Width="2.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Auditing\AuditingException.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="TMS.SimpleAudit.Auditing.SimpleAuditContext">
+    <Position X="7" Y="8.5" Width="2" />
+    <TypeIdentifier>
+      <HashCode>gCAEAAAAAAAAAEAAAAAAAAAAAAAAAAAIAAAQAAAAAAE=</HashCode>
+      <FileName>Auditing\SimpleAuditContext.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsAssociation>
+      <Field Name="_wrapper" />
+      <Property Name="AuditingManager" />
+    </ShowAsAssociation>
+  </Class>
+  <Class Name="TMS.SimpleAudit.Auditing.SimpleAuditManager">
+    <Position X="11.75" Y="4.25" Width="3.5" />
+    <TypeIdentifier>
+      <HashCode>QQgAABAAAgMAACAgQAYAgAAAAAAAAAAIABEQRYAAQgA=</HashCode>
+      <FileName>Auditing\SimpleAuditManager.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsAssociation>
+      <Property Name="AuditSettings" />
+    </ShowAsAssociation>
+    <ShowAsCollectionAssociation>
+      <Property Name="AuditableChanges" />
+    </ShowAsCollectionAssociation>
+  </Class>
+  <Class Name="TMS.SimpleAudit.Configurations.AuditConfigurationException">
+    <Position X="3" Y="3.25" Width="2.25" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Configurations\AuditConfigurationException.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="TMS.SimpleAudit.Configurations.GroupAuditConfiguration&lt;TGroupAuditModel&gt;">
+    <Position X="7.75" Y="5.25" Width="2.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAQAEAAAAAABAAAAQAAAAACAAAgAAQAAAAAAAA=</HashCode>
+      <FileName>Configurations\GroupAuditConfiguration.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsAssociation>
+      <Field Name="_manager" />
+      <Field Name="_groupAuditSettings" />
+    </ShowAsAssociation>
+  </Class>
+  <Class Name="TMS.SimpleAudit.Configurations.TableAuditConfiguration&lt;TTableModel&gt;">
+    <Position X="16.25" Y="4.25" Width="2.5" />
+    <TypeIdentifier>
+      <HashCode>EAACAAAQAAAAAAgABAEAAQAACAACAIAAAgQgQDAAAAA=</HashCode>
+      <FileName>Configurations\TableAuditConfiguration.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsAssociation>
+      <Field Name="_manager" />
+      <Field Name="_groupAuditSettings" />
+    </ShowAsAssociation>
+  </Class>
+  <Class Name="TMS.SimpleAudit.Help.Mapper">
+    <Position X="0.5" Y="1.25" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAA=</HashCode>
+      <FileName>Help\Mapper.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="TMS.SimpleAudit.InfoModels.ColumnAuditInfo">
+    <Position X="0.5" Y="5.75" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AEQAAAAAAgIEAAAAAAAAEAAAAAAAAAAAAAgQCABAAAA=</HashCode>
+      <FileName>InfoModels\ColumnAuditInfo.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="TMS.SimpleAudit.InfoModels.RowAuditInfo">
+    <Position X="4" Y="6.5" Width="2.25" />
+    <TypeIdentifier>
+      <HashCode>AAAAACAQAAAAAAAAMAAAAAAACAAAAACAAEAAUAAAAAQ=</HashCode>
+      <FileName>InfoModels\RowAuditInfo.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsAssociation>
+      <Property Name="Action" />
+      <Property Name="EntityAuditSettings" />
+    </ShowAsAssociation>
+    <ShowAsCollectionAssociation>
+      <Property Name="ColumnsChanges" />
+      <Property Name="ColumnsAuditInfos" />
+    </ShowAsCollectionAssociation>
+  </Class>
+  <Class Name="TMS.SimpleAudit.Settings.AuditSettings">
+    <Position X="12.25" Y="12.5" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AgAAAAAAAACEAAIAAAAAAQAAAACAAAAAIAAAAAAAAAA=</HashCode>
+      <FileName>Settings\AuditSettings.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsAssociation>
+      <Field Name="_manager" />
+    </ShowAsAssociation>
+    <ShowAsCollectionAssociation>
+      <Field Name="_groupsSettings" />
+    </ShowAsCollectionAssociation>
+  </Class>
+  <Class Name="TMS.SimpleAudit.Settings.EntityAuditSettings">
+    <Position X="4" Y="10" Width="2.25" />
+    <TypeIdentifier>
+      <HashCode>MAAAAClAAACAAAAAAAAAAQAADAAABAAAACAACAAAAAA=</HashCode>
+      <FileName>Settings\EntityAuditSettings.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsAssociation>
+      <Field Name="_manager" />
+      <Property Name="GroupAuditSettings" />
+    </ShowAsAssociation>
+    <ShowAsCollectionAssociation>
+      <Field Name="AuditableProperties" />
+    </ShowAsCollectionAssociation>
+  </Class>
+  <Class Name="TMS.SimpleAudit.Settings.GroupAuditSettings&lt;TGroupAuditModel&gt;" BaseTypeListCollapsed="true">
+    <Position X="8" Y="12.5" Width="3" />
+    <TypeIdentifier>
+      <HashCode>AAAABAAIAADAAAAAAAghBQAAAIAAAACAAEAEBAAggAA=</HashCode>
+      <FileName>Settings\GroupAuditSettings.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsAssociation>
+      <Field Name="_manager" />
+    </ShowAsAssociation>
+    <ShowAsCollectionAssociation>
+      <Property Name="EntityAuditSettings" />
+    </ShowAsCollectionAssociation>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="TMS.SimpleAudit.Settings.PropertyAuditSettings">
+    <Position X="0.5" Y="10" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAQAgIEAAAAAAAAAAAAAAAAAAAAAAASAABBAAA=</HashCode>
+      <FileName>Settings\PropertyAuditSettings.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Interface Name="TMS.SimpleAudit.Settings.IGroupAuditSettings">
+    <Position X="16.25" Y="11.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAgAAACEBAAAAAAAAAAAAAAAgAACAAAABAAAAAA=</HashCode>
+      <FileName>Settings\IGroupAuditSettings.cs</FileName>
+    </TypeIdentifier>
+  </Interface>
+  <Enum Name="TMS.SimpleAudit.Configurations.AutoExcludeColumnType">
+    <Position X="0.5" Y="2.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAQAAAAAAAAABAAAAAAAAAAIAAAAAAAAAAAEAgAA=</HashCode>
+      <FileName>Configurations\AutoExcludeColumnType.cs</FileName>
+    </TypeIdentifier>
+  </Enum>
+  <Enum Name="TMS.SimpleAudit.InfoModels.AuditAction">
+    <Position X="4.25" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAABAAEEAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>InfoModels\AuditAction.cs</FileName>
+    </TypeIdentifier>
+  </Enum>
+  <Font Name="Segoe UI" Size="9" />
+</ClassDiagram>
